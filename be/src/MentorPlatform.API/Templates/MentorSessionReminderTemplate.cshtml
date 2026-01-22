@@ -1,0 +1,138 @@
+﻿@using MentorPlatform.Domain.Enums
+@model MentorPlatform.Application.Commons.Models.Mail.MentorSessionReminderModel
+@{
+    Layout = null;
+}
+
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Upcoming Mentoring Session Reminder</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f8f9fa;
+        }
+
+        .email-container {
+            background-color: #ffffff;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #e9ecef;
+        }
+
+        .header h1 {
+            color: #2c3e50;
+            margin: 0;
+            font-size: 24px;
+        }
+
+        .session-details {
+            background-color: #f8f9fa;
+            border-left: 4px solid #007bff;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 5px;
+        }
+
+        .session-details h2 {
+            color: #007bff;
+            margin-top: 0;
+            font-size: 18px;
+        }
+
+        .detail-item {
+            margin: 10px 0;
+            display: flex;
+            align-items: center;
+        }
+
+        .detail-label {
+            font-weight: bold;
+            color: #495057;
+            display: inline-block;
+            margin-right: 4px;
+        }
+
+        .detail-value {
+            color: #212529;
+        }
+
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #e9ecef;
+            color: #6c757d;
+            font-size: 14px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="email-container">
+        <div class="header">
+            <h1>📅 Mentoring Session Reminder</h1>
+            <p>Hello @Model.MentorName. You have an upcoming session with your learner.</p>
+        </div>
+
+        <div class="session-details">
+            <h2>Session Details</h2>
+            <div class="detail-item">
+                <span class="detail-label">⏰ Start time:</span>
+                <span class="detail-value">@Model.StartTime.ToString("dddd, MMMM d, yyyy - hh:mm tt 'UTC'zzz")</span>
+            </div>
+            <div class="detail-item">
+                <span class="detail-label">🛑 End time:</span>
+                <span class="detail-value">@Model.EndTime.ToString("dddd, MMMM d, yyyy - hh:mm tt 'UTC'zzz")</span>
+            </div>
+            <div class="detail-item">
+                <span class="detail-label">🧑‍🏫 Session type:</span>
+                <span class="detail-value">
+                    @switch (Model.SessionType)
+                    {
+                        case SessionType.InPerson:
+                            <text>In Person</text>
+                            break;
+                        case SessionType.Virtual:
+                            <text>Virtual</text>
+                            break;
+                        case SessionType.Onsite:
+                            <text>On Site</text>
+                            break;
+                    }
+                </span>
+            </div>
+            <div class="detail-item">
+                <span class="detail-label">📝 Course:</span>
+                <span class="detail-value">@Model.CourseName</span>
+            </div>
+            <div class="detail-item">
+                <span class="detail-label">👨‍🎓 Learner:</span>
+                <span class="detail-value">@Model.LearnerName</span>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p>This is an automated reminder from your Mentoring Platform.</p>
+            <p>© 2025 MentorConnect. All rights reserved.</p>
+        </div>
+    </div>
+</body>
+
+</html>

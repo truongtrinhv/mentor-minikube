@@ -1,0 +1,2 @@
+cd fe
+npx lint-staged

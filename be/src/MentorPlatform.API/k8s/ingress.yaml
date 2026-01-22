@@ -1,0 +1,53 @@
+# Optional: Ingress Configuration
+# Use this if you want to set up HTTPS and custom domain routing
+# Requires an Ingress Controller (nginx, traefik, etc.)
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: mentorplatform-ingress
+  namespace: default
+  annotations:
+    # nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/websocket-services: "mentorplatform-api-service"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+spec:
+  ingressClassName: nginx
+  tls:
+  - hosts:
+    - api.mentorplatform.local
+    secretName: mentorplatform-tls
+  rules:
+  - host: api.mentorplatform.local
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: mentorplatform-api-service
+            port:
+              number: 80
+---
+# For local testing without TLS
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: mentorplatform-ingress-http
+  namespace: default
+  annotations:
+    nginx.ingress.kubernetes.io/websocket-services: "mentorplatform-api-service"
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: localhost
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: mentorplatform-api-service
+            port:
+              number: 80

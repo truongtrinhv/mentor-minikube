@@ -1,0 +1,6 @@
+@MentorPlatform.API_HostAddress = http://localhost:5196
+
+GET {{MentorPlatform.API_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

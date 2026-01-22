@@ -1,0 +1,102 @@
+@model MentorPlatform.Application.Commons.Models.Mail.EmailSessionRescheduleModel
+@{
+    Layout = null;
+}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <title>Session Reschedule Notification</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f4;
+            font-family: Arial, sans-serif;
+            color: #333;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 40px auto;
+            background-color: #fff;
+            padding: 24px;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+        }
+
+        .header {
+            text-align: center;
+            color: #444;
+            margin-bottom: 24px;
+        }
+
+        .booking-details {
+            font-size: 16px;
+            padding: 16px;
+            border: 2px solid #e6f0fa;
+            border-radius: 4px;
+            background-color: #f9fcff;
+            text-align: left;
+            margin: 30px 0;
+        }
+
+        .footer {
+            font-size: 12px;
+            color: #777;
+            text-align: center;
+            margin-top: 32px;
+        }
+
+        a {
+            color: #0066cc;
+            text-decoration: none;
+        }
+
+            a:hover {
+                text-decoration: underline;
+            }
+            
+        .changed {
+            color: #e74c3c;
+            font-weight: bold;
+            text-decoration: line-through;
+        }
+        
+        .new {
+            color: #27ae60;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2 class="header">SESSION RESCHEDULE NOTIFICATION</h2>
+        <p>Hello <strong>@Model.MentorName</strong>,</p>
+        <p>You have successfully rescheduled a mentoring session for <strong>@Model.CourseName</strong>. The session has been updated with the following details:</p>
+
+        <div class="booking-details">
+            <p><strong>Learner:</strong> @Model.LearnerName</p>
+            <p><strong>Course:</strong> @Model.CourseName</p>
+            <p><strong>Previous Start time:</strong> <span class="changed">@Model.OldStartTime</span></p>
+            <p><strong>Previous End time:</strong> <span class="changed">@Model.OldEndTime</span></p>
+            <p><strong>New Start time:</strong> <span class="new">@Model.NewStartTime</span></p>
+            <p><strong>New End time:</strong> <span class="new">@Model.NewEndTime</span></p>
+            <p><strong>Session Type:</strong> @Model.SessionTypeName</p>
+            @if (!string.IsNullOrEmpty(Model.Notes))
+            {
+                <p><strong>Notes:</strong> @Model.Notes</p>
+            }
+        </div>
+
+        <p>The learner has been notified of this change. If they accept the new schedule, the session will be confirmed. Otherwise, the session may be cancelled.</p>
+        <hr />
+
+        <p class="footer">
+            If you have any questions, feel free to contact us at
+            <a href="mailto:@Model.SupportEmail">@Model.SupportEmail</a>.
+        </p>
+    </div>
+</body>
+</html> 

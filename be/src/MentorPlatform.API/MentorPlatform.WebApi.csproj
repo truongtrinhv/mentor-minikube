@@ -1,0 +1,34 @@
+﻿    <Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+	  <PreserveCompilationContext>true</PreserveCompilationContext>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="9.0.5" />
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="9.0.2" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.5">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="8.1.1" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Templates\*.cshtml" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Remove="Templates\ApplicationRequestStatusChangeMailTemplate.cshtml" />
+    <Content Remove="Templates\LearnerBookingConfirmationMailTemplate.cshtml" />
+    <Content Remove="Templates\MentorBookingConfirmationMailTemplate.cshtml" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\MentorPlatform.Application\MentorPlatform.Application.csproj" />
+    <ProjectReference Include="..\MentorPlatform.CrossCuttingConcerns\MentorPlatform.CrossCuttingConcerns.csproj" />
+    <ProjectReference Include="..\MentorPlatform.Infrastructure\MentorPlatform.Infrastructure.csproj" />
+    <ProjectReference Include="..\MentorPlatform.Persistence\MentorPlatform.Persistence.csproj" />
+  </ItemGroup>
+
+</Project>

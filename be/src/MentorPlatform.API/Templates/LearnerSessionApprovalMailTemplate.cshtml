@@ -1,0 +1,89 @@
+@model MentorPlatform.Application.Commons.Models.Mail.EmailSessionApprovalModel
+@{
+    Layout = null;
+}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <title>Session Approval Notification</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f4;
+            font-family: Arial, sans-serif;
+            color: #333;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 40px auto;
+            background-color: #fff;
+            padding: 24px;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+        }
+
+        .header {
+            text-align: center;
+            color: #444;
+            margin-bottom: 24px;
+        }
+
+        .booking-details {
+            font-size: 16px;
+            padding: 16px;
+            border: 2px solid #e6f0fa;
+            border-radius: 4px;
+            background-color: #f9fcff;
+            text-align: left;
+            margin: 30px 0;
+        }
+
+        .footer {
+            font-size: 12px;
+            color: #777;
+            text-align: center;
+            margin-top: 32px;
+        }
+
+        a {
+            color: #0066cc;
+            text-decoration: none;
+        }
+
+            a:hover {
+                text-decoration: underline;
+            }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2 class="header">SESSION APPROVAL CONFIRMATION</h2>
+        <p>Hello <strong>@Model.LearnerName</strong>,</p>
+        <p>Great news! Your mentoring session for <strong>@Model.CourseName</strong> has been approved and confirmed. Here are the details of your session:</p>
+
+        <div class="booking-details">
+            <p><strong>Mentor:</strong> @Model.MentorName</p>
+            <p><strong>Course:</strong> @Model.CourseName</p>
+            <p><strong>Start time:</strong> @Model.StartTime</p>
+            <p><strong>End time:</strong> @Model.EndTime</p>
+            <p><strong>Session Type:</strong> @Model.SessionTypeName</p>
+            @if (!string.IsNullOrEmpty(Model.Notes))
+            {
+                <p><strong>Notes:</strong> @Model.Notes</p>
+            }
+        </div>
+
+        <p>Please make sure to prepare for the session and be on time. If you need to make any changes to your booking, please contact us as soon as possible.</p>
+        <hr />
+
+        <p class="footer">
+            If you have any questions, feel free to contact us at
+            <a href="mailto:@Model.SupportEmail">@Model.SupportEmail</a>.
+        </p>
+    </div>
+</body>
+</html> 

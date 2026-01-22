@@ -1,0 +1,68 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mentorplatform-config
+  namespace: default
+data:
+  # Logging Configuration
+  Logging__LogLevel__Default: "Information"
+  Logging__LogLevel__Microsoft.AspNetCore: "Warning"
+  
+  # JWT Token Options
+  JwtTokenOptions__ExpireTokenMinutes: "600"
+  JwtTokenOptions__ExpireRefreshTokenDays: "30"
+  JwtTokenOptions__RequireHttpsMetadata: "false"
+  JwtTokenOptions__ValidateIssuer: "false"
+  JwtTokenOptions__ValidateAudience: "false"
+  JwtTokenOptions__Issuer: "https://mentorplatform-api"
+  JwtTokenOptions__Audience: "https://mentorplatform-api"
+  
+  # CORS Options
+  CorsOptions__PolicyName: "Default"
+  CorsOptions__AllowedOrigins__0: "https://mentorplatformgr2-f5gxcbe9c7ghepa0.southeastasia-01.azurewebsites.net"
+  CorsOptions__AllowedOrigins__1: "http://localhost:3000"
+  CorsOptions__AllowedOrigins__2: "http://localhost:4200"
+  CorsOptions__AllowCredentials: "true"
+  
+  # Email Settings
+  EmailSettingsOptions__MailServer: "smtp.gmail.com"
+  EmailSettingsOptions__MailPort: "587"
+  EmailSettingsOptions__SenderName: "MentorConnection"
+  
+  # File Storage Options
+  FileStorageOptions__FileStorageProvider: "CloudinaryStorageServices"
+  FileStorageOptions__CloudinaryStorageOptions__ExpireSignatureMinutes: "2"
+  
+  # Media Settings - Images
+  FileStorageOptions__MediaSettings__Images__AllowedExtensions__0: ".jpg"
+  FileStorageOptions__MediaSettings__Images__AllowedExtensions__1: ".jpeg"
+  FileStorageOptions__MediaSettings__Images__AllowedExtensions__2: ".png"
+  FileStorageOptions__MediaSettings__Images__AllowedExtensions__3: ".gif"
+  FileStorageOptions__MediaSettings__Images__AllowedExtensions__4: ".webp"
+  FileStorageOptions__MediaSettings__Images__AllowedExtensions__5: ".svg"
+  FileStorageOptions__MediaSettings__Images__MaxSizeBytes: "5000000"
+  FileStorageOptions__MediaSettings__Images__FolderPath: "mentor-platform/images"
+  
+  # Media Settings - Videos
+  FileStorageOptions__MediaSettings__Videos__AllowedExtensions__0: ".mp4"
+  FileStorageOptions__MediaSettings__Videos__AllowedExtensions__1: ".avi"
+  FileStorageOptions__MediaSettings__Videos__AllowedExtensions__2: ".mov"
+  FileStorageOptions__MediaSettings__Videos__AllowedExtensions__3: ".wmv"
+  FileStorageOptions__MediaSettings__Videos__AllowedExtensions__4: ".webm"
+  FileStorageOptions__MediaSettings__Videos__MaxSizeBytes: "10000000"
+  FileStorageOptions__MediaSettings__Videos__FolderPath: "mentor-platform/videos"
+  
+  # Media Settings - Documents
+  FileStorageOptions__MediaSettings__Documents__AllowedExtensions__0: ".pdf"
+  FileStorageOptions__MediaSettings__Documents__AllowedExtensions__1: ".docx"
+  FileStorageOptions__MediaSettings__Documents__AllowedExtensions__2: ".doc"
+  FileStorageOptions__MediaSettings__Documents__AllowedExtensions__3: ".xlsx"
+  FileStorageOptions__MediaSettings__Documents__AllowedExtensions__4: ".xls"
+  FileStorageOptions__MediaSettings__Documents__AllowedExtensions__5: ".pptx"
+  FileStorageOptions__MediaSettings__Documents__AllowedExtensions__6: ".ppt"
+  FileStorageOptions__MediaSettings__Documents__AllowedExtensions__7: ".txt"
+  FileStorageOptions__MediaSettings__Documents__MaxSizeBytes: "10000000"
+  FileStorageOptions__MediaSettings__Documents__FolderPath: "mentor-platform/documents"
+  
+  # ASP.NET Core Environment
+  ASPNETCORE_ENVIRONMENT: "Production"
