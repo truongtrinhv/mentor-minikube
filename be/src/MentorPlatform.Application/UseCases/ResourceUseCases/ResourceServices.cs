@@ -280,11 +280,11 @@ public class ResourceServices : IResourceServices
             var learnerResources = _mentorSessionRepository.GetQueryable()
                 .Where(x => x.LearnerId == userId && x.RequestStatus == RequestMentoringSessionStatus.Scheduled || x.RequestStatus == RequestMentoringSessionStatus.Completed)
                 .Select(x => x.Course).SelectMany(c => c.CourseResources).Where(cr => cr.Resource != null)
-                .Select(cr => cr.Resource.Id).Distinct();
+                .Select(cr => cr.Resource!.Id).Distinct();
 
             var learnerCourses = await _mentorSessionRepository.ToListAsync(learnerResources);
 
-            if (!learnerCourses.Any(x => x == id))
+            if (!learnerCourses.Contains(id))
             {
                 return Result.Failure(403, ResourceErrors.LearnerCanNotViewResource);
             }

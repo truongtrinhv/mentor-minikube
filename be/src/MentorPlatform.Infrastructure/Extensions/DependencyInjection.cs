@@ -23,6 +23,7 @@ public static class DependencyInjection
 {
     public static IServiceCollection ConfigureInfrastructureLayer(this IServiceCollection services)
     {
+        var config = GetConfiguration(services);
         services.AddTransient<IApplicationMailServices, ApplicationMailServices>();
         services.AddHostedService<MailSenderBackgroundService>();
         services.AddHostedService<MentorSessionReminderBackgroundService>();
@@ -30,7 +31,9 @@ public static class DependencyInjection
         services.ConfigureInfrastructureServices()
             .ConfigureCaching()
             .ConfigureExecutionContext()
-            .ConfigureInfrastructureOptions();
+            .ConfigureInfrastructureOptions()
+            .AddRabbitMQMessageBus(config)
+            .AddDomainEventDispatcher();
         return services;
     }
 

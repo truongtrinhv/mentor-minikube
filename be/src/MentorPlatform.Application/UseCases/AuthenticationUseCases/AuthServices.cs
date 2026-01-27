@@ -377,37 +377,39 @@ public class AuthServices : IAuthServices
         user.IsPrivateProfile = editingUserProfileRequest.IsPrivateProfile;
         user.IsReceiveMessage = editingUserProfileRequest.IsReceiveMessage;
 
-        user.UserDetail.FullName = editingUserProfileRequest.FullName?.Trim();
-        user.UserDetail.Bio = editingUserProfileRequest.Bio?.Replace("\r\n", "\n")?.Trim();
-        user.UserDetail.Experience = editingUserProfileRequest.Experience?.Replace("\r\n", "\n")?.Trim();
-        user.UserDetail.ProfessionalSkill = editingUserProfileRequest.ProfessionalSkill?.Replace("\r\n", "\n")?.Trim();
-        user.UserDetail.Goals = editingUserProfileRequest.Goals?.Replace("\r\n", "\n")?.Trim();
-        user.UserDetail.Duration = editingUserProfileRequest.Duration;
-        user.UserDetail.SessionFrequency = (SessionFrequency)editingUserProfileRequest.SessionFrequency;
-
-        if (editingUserProfileRequest.CommunicationPreference != null)
+        if (user.UserDetail != null)
         {
-            user.UserDetail.CommunicationPreference = (CommunicationPreference)editingUserProfileRequest.CommunicationPreference.Value;
-        }
+            user.UserDetail.FullName = editingUserProfileRequest.FullName?.Trim();
+            user.UserDetail.Bio = editingUserProfileRequest.Bio?.Replace("\r\n", "\n")?.Trim();
+            user.UserDetail.Experience = editingUserProfileRequest.Experience?.Replace("\r\n", "\n")?.Trim();
+            user.UserDetail.ProfessionalSkill = editingUserProfileRequest.ProfessionalSkill?.Replace("\r\n", "\n")?.Trim();
+            user.UserDetail.Goals = editingUserProfileRequest.Goals?.Replace("\r\n", "\n")?.Trim();
+            user.UserDetail.Duration = editingUserProfileRequest.Duration;
+            user.UserDetail.SessionFrequency = (SessionFrequency)editingUserProfileRequest.SessionFrequency;
 
-        if (editingUserProfileRequest.LearningStyle != null)
-        {
-            user.UserDetail.LearningStyle = (LearningStyle)editingUserProfileRequest.LearningStyle.Value;
-        }
+            if (editingUserProfileRequest.CommunicationPreference != null)
+            {
+                user.UserDetail.CommunicationPreference = (CommunicationPreference)editingUserProfileRequest.CommunicationPreference.Value;
+            }
 
-        if (editingUserProfileRequest.TeachingStyles != null)
-        {
-            user.UserDetail.TeachingStyles = editingUserProfileRequest.TeachingStyles
-                .Select(t => (TeachingStyle)t)
-                .ToList();
-        }
+            if (editingUserProfileRequest.LearningStyle != null)
+            {
+                user.UserDetail.LearningStyle = (LearningStyle)editingUserProfileRequest.LearningStyle.Value;
+            }
 
-        if (editingUserProfileRequest.Availability != null)
-        {
-            user.UserDetail.Availability = editingUserProfileRequest.Availability
-                .Select(a => (UserAvailability)a)
-                .ToList();
-        }
+            if (editingUserProfileRequest.TeachingStyles != null)
+            {
+                user.UserDetail.TeachingStyles = editingUserProfileRequest.TeachingStyles
+                    .Select(t => (TeachingStyle)t)
+                    .ToList();
+            }
+
+            if (editingUserProfileRequest.Availability != null)
+            {
+                user.UserDetail.Availability = editingUserProfileRequest.Availability
+                    .Select(a => (UserAvailability)a)
+                    .ToList();
+            }
 
         if (editingUserProfileRequest.Expertises != null)
         {
@@ -448,7 +450,11 @@ public class AuthServices : IAuthServices
         if (editingUserProfileRequest.AvatarUrl != null)
         {
             var userAvatarUrl = await UploadImageAndGetAvatarUrlAsync(editingUserProfileRequest.AvatarUrl);
-            user.UserDetail.AvatarUrl = userAvatarUrl;
+            if (user.UserDetail != null)
+            {
+                user.UserDetail.AvatarUrl = userAvatarUrl;
+            }
+        }
         }
 
         _userRepository.Update(user);

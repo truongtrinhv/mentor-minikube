@@ -353,14 +353,14 @@ public class CourseServices : ICourseServices
                  },
 
                  HasAccessResourcePermission = hasMentorAccess ||
-                     x.MentoringSessions
-                         .Any(ms => (ms.RequestStatus == RequestMentoringSessionStatus.Scheduled || ms.RequestStatus == RequestMentoringSessionStatus.Completed)
-                                    && ms.LearnerId == userId),
+                     (x.MentoringSessions != null &&
+                         x.MentoringSessions.Any(ms => (ms.RequestStatus == RequestMentoringSessionStatus.Scheduled || ms.RequestStatus == RequestMentoringSessionStatus.Completed)
+                                    && ms.LearnerId == userId)),
 
                  Resources = (hasMentorAccess ||
-                     x.MentoringSessions
-                         .Any(ms => (ms.RequestStatus == RequestMentoringSessionStatus.Scheduled || ms.RequestStatus == RequestMentoringSessionStatus.Completed)
-                                    && ms.LearnerId == userId))
+                     (x.MentoringSessions != null &&
+                         x.MentoringSessions.Any(ms => (ms.RequestStatus == RequestMentoringSessionStatus.Scheduled || ms.RequestStatus == RequestMentoringSessionStatus.Completed)
+                                    && ms.LearnerId == userId)))
                      ? (x.CourseResources != null
                             ? x.CourseResources.Select(r => new ResourceResponse
                             {

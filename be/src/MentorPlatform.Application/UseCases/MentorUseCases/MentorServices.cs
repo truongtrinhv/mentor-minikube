@@ -138,7 +138,7 @@ public class MentorServices : IMentorServices
                     return paginationResult;
                 });
 
-            return Result<PaginationResult<MentorWithCoursesResponse>>.Success(result);
+            return Result<PaginationResult<MentorWithCoursesResponse>>.Success(result!);
         }
         catch (Exception ex)
         {
@@ -167,16 +167,16 @@ public class MentorServices : IMentorServices
                 var courses = await _courseRepository
                     .ToListAsync(coursesQuery, nameof(Course.CourseCategory), nameof(Course.MentoringSessions));
 
-                var topCourses = courses.Select(c => c.ToResponse(c.MentoringSessions
+                var topCourses = courses.Select(c => c.ToResponse(c.MentoringSessions?
                                                         .GroupBy(ms => ms.LearnerId)
-                                                        .Count()))
+                                                        .Count() ?? 0))
                                         .OrderByDescending(c => c.LearnerCount)
                                         .Take(courseNumber)
                                         .ToList();
                 return topCourses;
             });
         
-        return Result<List<CourseResponse>>.Success(result);
+        return Result<List<CourseResponse>>.Success(result!);
     }
 
     public async Task<Result> GetUpcomingSessions(int sessionNumber = 5)

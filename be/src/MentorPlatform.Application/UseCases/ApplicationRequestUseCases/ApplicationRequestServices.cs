@@ -411,7 +411,7 @@ public class ApplicationRequestServices : IApplicationRequestServices
 
         if (applicationDetailResponse == null)
         {
-            return Result<ApplicationRequestDetailResponse>.Success(null);
+            return Result<ApplicationRequestDetailResponse>.Failure(new Error("ApplicationRequest.NotFound", "Application request not found"));
         }
 
         return Result<ApplicationRequestDetailResponse>.Success(applicationDetailResponse);

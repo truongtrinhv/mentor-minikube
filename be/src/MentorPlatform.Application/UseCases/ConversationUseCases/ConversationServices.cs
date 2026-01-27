@@ -98,7 +98,7 @@ public class ConversationServices : IConversationServices
             var isConversationExistedQuery = _conversationRepository.GetQueryable()
                 .Where(c => c.Participants.Any(p => p.UserId == userId) &&
                           c.Participants.Any(p => request.UserIds[0] == p.UserId) &&
-                          c.IsGroup == false);
+                          !c.IsGroup);
             var isConversationExisted = await _conversationRepository.AnyAsync(isConversationExistedQuery);
             if (isConversationExisted)
             {
@@ -316,7 +316,8 @@ public class ConversationServices : IConversationServices
         var listIds = ExtractUserIds(message.Content);
 
         var listNoti = new List<Notification>();
-        var conversationName = conversation.IsGroup ? conversation.ConversationName : "your conversation";
+        var conversationName = conversation?.IsGroup == true ? conversation.ConversationName : "your conversation";
+        var userName = user?.UserDetail?.FullName ?? "Someone";
         foreach (var id in listIds)
         {
             if (Guid.TryParse(id, out var guid))
@@ -324,7 +325,7 @@ public class ConversationServices : IConversationServices
                 listNoti.Add(new Notification
                 {
                     Title = "Message",
-                    Message = $"{user.UserDetail.FullName} mention you in {conversationName}",
+                    Message = $"{userName} mention you in {conversationName}",
                     OwnerId = guid
                 });
             }

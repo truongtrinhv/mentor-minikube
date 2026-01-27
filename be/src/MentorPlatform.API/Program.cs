@@ -101,17 +101,46 @@ if (redisEnabled)
     var redisConnection = builder.Configuration.GetConnectionString("Redis");
     var instanceName = builder.Configuration.GetValue<string>("RedisOptions:InstanceName") ?? "MentorPlatform:";
     
-    // Register ConnectionMultiplexer for advanced Redis operations
-    builder.Services.AddSingleton<StackExchange.Redis.IConnectionMultiplexer>(sp =>
+    try
     {
-        return StackExchange.Redis.ConnectionMultiplexer.Connect(redisConnection!);
-    });
-    
-    builder.Services.AddStackExchangeRedisCache(options =>
+        // Configure Redis with connection resilience
+        var redisConfigurationOptions = StackExchange.Redis.ConfigurationOptions.Parse(redisConnection!);
+        redisConfigurationOptions.AbortOnConnectFail = false;
+        redisConfigurationOptions.ConnectTimeout = 5000;
+        redisConfigurationOptions.SyncTimeout = 5000;
+        redisConfigurationOptions.ConnectRetry = 3;
+        redisConfigurationOptions.KeepAlive = 60;
+        
+        // Register ConnectionMultiplexer for advanced Redis operations
+        builder.Services.AddSingleton<StackExchange.Redis.IConnectionMultiplexer>(sp =>
+        {
+            var logger = sp.GetRequiredService<ILogger<Program>>();
+            try
+            {
+                logger.LogInformation("Attempting to connect to Redis at {RedisConnection}", redisConnection);
+                var connection = StackExchange.Redis.ConnectionMultiplexer.Connect(redisConfigurationOptions);
+                logger.LogInformation("Successfully connected to Redis");
+                return connection;
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Failed to connect to Redis. Application will continue with in-memory cache.");
+                throw;
+            }
+        });
+        
+        builder.Services.AddStackExchangeRedisCache(options =>
+        {
+            options.ConfigurationOptions = redisConfigurationOptions;
+            options.InstanceName = instanceName;
+        });
+    }
+    catch (Exception ex)
     {
-        options.Configuration = redisConnection;
-        options.InstanceName = instanceName;
-    });
+        var logger = builder.Services.BuildServiceProvider().GetRequiredService<ILogger<Program>>();
+        logger.LogWarning(ex, "Failed to configure Redis. Falling back to in-memory cache.");
+        builder.Services.AddDistributedMemoryCache();
+    }
 }
 else
 {

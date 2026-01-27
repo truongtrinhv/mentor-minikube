@@ -56,6 +56,30 @@ Write-Host ""
 
 Set-Location ..
 
+# Deploy Redis Cache
+Write-Host "Deploying Redis Cache..." -ForegroundColor Yellow
+kubectl apply -f be\src\MentorPlatform.API\k8s\redis.yaml
+Write-Host "✓ Redis deployed" -ForegroundColor Green
+Write-Host ""
+
+# Wait for Redis to be ready
+Write-Host "Waiting for Redis to be ready..." -ForegroundColor Blue
+kubectl wait --for=condition=ready pod -l app=redis -n mentorplatform --timeout=300s
+Write-Host "✓ Redis is ready" -ForegroundColor Green
+Write-Host ""
+
+# Deploy RabbitMQ
+Write-Host "Deploying RabbitMQ Message Broker..." -ForegroundColor Yellow
+kubectl apply -f be\src\MentorPlatform.API\k8s\rabbitmq.yaml
+Write-Host "✓ RabbitMQ deployed" -ForegroundColor Green
+Write-Host ""
+
+# Wait for RabbitMQ to be ready
+Write-Host "Waiting for RabbitMQ to be ready..." -ForegroundColor Blue
+kubectl wait --for=condition=ready pod -l app=rabbitmq -n mentorplatform --timeout=300s
+Write-Host "✓ RabbitMQ is ready" -ForegroundColor Green
+Write-Host ""
+
 # Deploy Backend API
 Write-Host "Deploying Backend API..." -ForegroundColor Yellow
 kubectl apply -f be\src\MentorPlatform.API\k8s\configmap.yaml
@@ -156,6 +180,16 @@ Write-Host "  Health:   http://$MINIKUBE_IP:30080/health"
 Write-Host ""
 Write-Host "Frontend:" -ForegroundColor Green
 Write-Host "  NodePort: http://$MINIKUBE_IP:30001"
+Write-Host ""
+Write-Host "RabbitMQ Management UI:" -ForegroundColor Green
+Write-Host "  URL:      http://$MINIKUBE_IP:31672"
+Write-Host "  Username: guest"
+Write-Host "  Password: guest"
+Write-Host ""
+Write-Host "RabbitMQ AMQP:" -ForegroundColor Green
+Write-Host "  Host:     rabbitmq (internal)"
+Write-Host "  Port:     5672"
+Write-Host "  VHost:    /"
 Write-Host ""
 Write-Host "To use Ingress, add to C:\Windows\System32\drivers\etc\hosts:" -ForegroundColor Yellow
 Write-Host "  $MINIKUBE_IP api.mentorplatform.local"

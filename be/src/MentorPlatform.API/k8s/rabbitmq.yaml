@@ -1,0 +1,139 @@
+---
+# RabbitMQ ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: rabbitmq-config
+  namespace: mentorplatform
+data:
+  enabled_plugins: |
+    [rabbitmq_management, rabbitmq_management_agent].
+  rabbitmq.conf: |
+    default_user = guest
+    default_pass = guest
+    default_permissions.configure = .*
+    default_permissions.read = .*
+    default_permissions.write = .*
+    vm_memory_high_watermark.relative = 0.6
+    channel_max = 1024
+    heartbeat = 60
+    log.file.level = info
+---
+# RabbitMQ Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: rabbitmq
+  namespace: mentorplatform
+  labels:
+    app: rabbitmq
+spec:
+  type: ClusterIP
+  ports:
+    - name: amqp
+      port: 5672
+      targetPort: 5672
+      protocol: TCP
+    - name: management
+      port: 15672
+      targetPort: 15672
+      protocol: TCP
+  selector:
+    app: rabbitmq
+---
+# RabbitMQ Management UI Service (NodePort)
+apiVersion: v1
+kind: Service
+metadata:
+  name: rabbitmq-management
+  namespace: mentorplatform
+  labels:
+    app: rabbitmq
+spec:
+  type: NodePort
+  ports:
+    - name: management
+      port: 15672
+      targetPort: 15672
+      nodePort: 31672
+      protocol: TCP
+  selector:
+    app: rabbitmq
+---
+# RabbitMQ StatefulSet
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: rabbitmq
+  namespace: mentorplatform
+  labels:
+    app: rabbitmq
+spec:
+  serviceName: rabbitmq
+  replicas: 1
+  selector:
+    matchLabels:
+      app: rabbitmq
+  template:
+    metadata:
+      labels:
+        app: rabbitmq
+    spec:
+      containers:
+        - name: rabbitmq
+          image: rabbitmq:3.13-management-alpine
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: amqp
+              containerPort: 5672
+              protocol: TCP
+            - name: management
+              containerPort: 15672
+              protocol: TCP
+          env:
+            - name: RABBITMQ_DEFAULT_USER
+              value: "guest"
+            - name: RABBITMQ_DEFAULT_PASS
+              value: "guest"
+            - name: RABBITMQ_DEFAULT_VHOST
+              value: "/"
+            - name: RABBITMQ_ERLANG_COOKIE
+              value: "SWQOKODSQALRPCLNMEQG"
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          livenessProbe:
+            tcpSocket:
+              port: amqp
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            tcpSocket:
+              port: amqp
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          volumeMounts:
+            - name: rabbitmq-config
+              mountPath: /etc/rabbitmq/conf.d/
+            - name: rabbitmq-data
+              mountPath: /var/lib/rabbitmq
+      volumes:
+        - name: rabbitmq-config
+          configMap:
+            name: rabbitmq-config
+  volumeClaimTemplates:
+    - metadata:
+        name: rabbitmq-data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 10Gi

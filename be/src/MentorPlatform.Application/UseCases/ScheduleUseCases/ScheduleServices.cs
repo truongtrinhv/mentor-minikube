@@ -169,7 +169,7 @@ public class ScheduleServices : IScheduleServices
         {
             return Result.Failure(ScheduleErrors.ScheduleNotBelongToMentor);
         }
-        if (schedule.MentoringSessions.Any(m => m.RequestStatus != RequestMentoringSessionStatus.Cancelled) &&
+        if (schedule.MentoringSessions?.Any(m => m.RequestStatus != RequestMentoringSessionStatus.Cancelled) == true &&
             schedule.StartTime >= DateTimeOffset.UtcNow)
         {
             return Result.Failure(ScheduleErrors.ScheduleHaveUpcomingSession);
@@ -197,7 +197,7 @@ public class ScheduleServices : IScheduleServices
         {
             return Result.Failure(ScheduleErrors.ScheduleNotBelongToMentor);
         }
-        if (selectedSchedule.MentoringSessions.Any(m => m.RequestStatus != RequestMentoringSessionStatus.Cancelled))
+        if (selectedSchedule.MentoringSessions?.Any(m => m.RequestStatus != RequestMentoringSessionStatus.Cancelled) == true)
         {
             return Result.Failure(ScheduleErrors.ScheduleHaveUpcomingSession);
         }

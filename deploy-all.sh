@@ -60,6 +60,30 @@ echo ""
 
 cd ..
 
+# Deploy Redis Cache
+echo -e "${YELLOW}Deploying Redis Cache...${NC}"
+kubectl apply -f be/src/MentorPlatform.API/k8s/redis.yaml
+echo -e "${GREEN}✓ Redis deployed${NC}"
+echo ""
+
+# Wait for Redis to be ready
+echo -e "${BLUE}Waiting for Redis to be ready...${NC}"
+kubectl wait --for=condition=ready pod -l app=redis -n mentorplatform --timeout=300s
+echo -e "${GREEN}✓ Redis is ready${NC}"
+echo ""
+
+# Deploy RabbitMQ
+echo -e "${YELLOW}Deploying RabbitMQ Message Broker...${NC}"
+kubectl apply -f be/src/MentorPlatform.API/k8s/rabbitmq.yaml
+echo -e "${GREEN}✓ RabbitMQ deployed${NC}"
+echo ""
+
+# Wait for RabbitMQ to be ready
+echo -e "${BLUE}Waiting for RabbitMQ to be ready...${NC}"
+kubectl wait --for=condition=ready pod -l app=rabbitmq -n mentorplatform --timeout=300s
+echo -e "${GREEN}✓ RabbitMQ is ready${NC}"
+echo ""
+
 # Deploy Backend API
 echo -e "${YELLOW}Deploying Backend API...${NC}"
 kubectl apply -f be/src/MentorPlatform.API/k8s/configmap.yaml
@@ -159,6 +183,16 @@ echo "  Health:   http://${MINIKUBE_IP}:30080/health"
 echo ""
 echo -e "${GREEN}Frontend:${NC}"
 echo "  NodePort: http://${MINIKUBE_IP}:30001"
+echo ""
+echo -e "${GREEN}RabbitMQ Management UI:${NC}"
+echo "  URL:      http://${MINIKUBE_IP}:31672"
+echo "  Username: guest"
+echo "  Password: guest"
+echo ""
+echo -e "${GREEN}RabbitMQ AMQP:${NC}"
+echo "  Host:     rabbitmq (internal)"
+echo "  Port:     5672"
+echo "  VHost:    /"
 echo ""
 echo -e "${YELLOW}To use Ingress, add to /etc/hosts:${NC}"
 echo "  ${MINIKUBE_IP} api.mentorplatform.local"
