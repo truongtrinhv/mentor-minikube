@@ -11,6 +11,7 @@ using MentorPlatform.Infrastructure.Emails;
 using MentorPlatform.Infrastructure.FileStorage;
 using MentorPlatform.Infrastructure.HostedServices;
 using MentorPlatform.Infrastructure.Identity;
+using MentorPlatform.Infrastructure.Messaging.Abstractions;
 using MentorPlatform.Infrastructure.Security;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -32,8 +33,7 @@ public static class DependencyInjection
             .ConfigureCaching()
             .ConfigureExecutionContext()
             .ConfigureInfrastructureOptions()
-            .AddRabbitMQMessageBus(config)
-            .AddDomainEventDispatcher();
+            .AddConfiguredMessageBus(config);
         return services;
     }
 
