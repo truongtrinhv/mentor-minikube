@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: mentorplatform-api
-  namespace: default
+  namespace: mentorplatform
   labels:
     app: mentorplatform-api
     version: v1

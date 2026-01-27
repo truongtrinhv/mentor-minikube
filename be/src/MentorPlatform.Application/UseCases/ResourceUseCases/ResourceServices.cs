@@ -5,6 +5,7 @@ using MentorPlatform.Application.Commons.Models.Requests.ResourceRequests;
 using MentorPlatform.Application.Commons.Models.Requests.ResourseRequests;
 using MentorPlatform.Application.Commons.Models.Responses.ResourceResponses;
 using MentorPlatform.Application.Identity;
+using MentorPlatform.Application.Services.Caching;
 using MentorPlatform.Application.Services.File;
 using MentorPlatform.Application.Services.FileStorage;
 using MentorPlatform.CrossCuttingConcerns.Caching;
@@ -31,6 +32,7 @@ public class ResourceServices : IResourceServices
     private readonly IUnitOfWork _unitOfWork;
     private readonly ILogger<ResourceServices> _logger;
     private readonly IMemoryCache _memoryCache;
+    private readonly ICacheService _cacheService;
 
     public ResourceServices(IResourceRepository resourceRepository,
         IExecutionContext executionContext,
@@ -40,7 +42,8 @@ public class ResourceServices : IResourceServices
         IUnitOfWork unitOfWork,
         ILogger<ResourceServices> logger,
         IOptions<FileStorageOptions> fileStorageOptions,
-        IMemoryCache memoryCache)
+        IMemoryCache memoryCache,
+        ICacheService cacheService)
     {
         _resourceRepository = resourceRepository;
         _executionContext = executionContext;
@@ -51,6 +54,7 @@ public class ResourceServices : IResourceServices
         _logger = logger;
         _fileStorageOptions = fileStorageOptions.Value;
         _memoryCache = memoryCache;
+        _cacheService = cacheService;
     }
 
     public async Task<Result> CreateResource(CreateResourceRequest request)
@@ -91,6 +95,10 @@ public class ResourceServices : IResourceServices
             _resourceRepository.Add(newResource);
             await _unitOfWork.SaveChangesAsync();
 
+            // Invalidate caches
+            await _cacheService.RemoveAsync(CacheKeys.Resource(newResource.Id));
+            await _cacheService.RemoveByPrefixAsync(CacheKeys.ResourcesByMentor(userId));
+
             return Result<string>.Success(ResourceCommandMessages.CreateSuccessfully);
         }
         catch (Exception ex)
@@ -120,6 +128,10 @@ public class ResourceServices : IResourceServices
         _resourceRepository.Update(selectedResource);
         await _unitOfWork.SaveChangesAsync();
 
+        // Invalidate caches
+        await _cacheService.RemoveAsync(CacheKeys.Resource(id));
+        await _cacheService.RemoveByPrefixAsync(CacheKeys.ResourcesByMentor(userId));
+
         return Result<string>.Success(ResourceCommandMessages.UpdateSuccessfully);
     }
 
@@ -141,7 +153,9 @@ public class ResourceServices : IResourceServices
 
         _resourceRepository.Update(selectedResource);
         await _unitOfWork.SaveChangesAsync();
-
+        // Invalidate caches
+        await _cacheService.RemoveAsync(CacheKeys.Resource(id));
+        await _cacheService.RemoveByPrefixAsync(CacheKeys.ResourcesByMentor(userId));
         return Result<string>.Success(ResourceCommandMessages.DeleteSuccessfully);
     }
 
@@ -155,43 +169,55 @@ public class ResourceServices : IResourceServices
             return Result.Failure(403, ResourceErrors.AdminCanNotViewResource);
         }
 
-        var learnerResourceIds = new List<Guid>();
-        if (selectedUser.Role == Role.Learner)
-        {
-            var learnerResourceQuery = _mentorSessionRepository.GetQueryable()
-                .Where(x => x.LearnerId == userId && (x.RequestStatus == RequestMentoringSessionStatus.Scheduled || x.RequestStatus == RequestMentoringSessionStatus.Completed))
-                .Select(x => x.Course).SelectMany(c => c.CourseResources).Where(cr => cr.Resource != null)
-                .Select(cr => cr.Resource.Id).Distinct();
+        // Build cache key based on query parameters and user role
+        var cacheKey = selectedUser.Role == Role.Mentor 
+            ? CacheKeys.ResourcesByMentor(userId, queryParameters?.PageNumber ?? 1, queryParameters?.PageSize ?? 10, queryParameters?.Search, queryParameters?.FileType?.ToString())
+            : CacheKeys.ResourcesByLearner(userId, queryParameters?.PageNumber ?? 1, queryParameters?.PageSize ?? 10, queryParameters?.Search, queryParameters?.FileType?.ToString());
 
-            learnerResourceIds = await _mentorSessionRepository.ToListAsync(learnerResourceQuery);
-        }
+        // Try to get from cache
+        var result = await _cacheService.GetOrSetPaginatedAsync(
+            cacheKey,
+            async () =>
+            {
+                var learnerResourceIds = new List<Guid>();
+                if (selectedUser.Role == Role.Learner)
+                {
+                    var learnerResourceQuery = _mentorSessionRepository.GetQueryable()
+                        .Where(x => x.LearnerId == userId && (x.RequestStatus == RequestMentoringSessionStatus.Scheduled || x.RequestStatus == RequestMentoringSessionStatus.Completed))
+                        .Select(x => x.Course).SelectMany(c => c.CourseResources).Where(cr => cr.Resource != null)
+                        .Select(cr => cr.Resource.Id).Distinct();
 
-        var searchValue = queryParameters?.Search?.Trim();
-        var queryFilter = _resourceRepository.GetQueryable()
-                        .Where(x => queryParameters == null ||
-                                    (string.IsNullOrEmpty(searchValue) || x.Title.Contains(searchValue))
-                                    && (queryParameters!.FileType == null || x.FileType == queryParameters.FileType)
-                                    && ((selectedUser.Role == Role.Learner && learnerResourceIds.Contains(x.Id)) || x.MentorId == selectedUser.Id));
+                    learnerResourceIds = await _mentorSessionRepository.ToListAsync(learnerResourceQuery);
+                }
 
-        var queryPagination = queryFilter
-                            .Skip((queryParameters!.PageNumber - 1) * queryParameters.PageSize)
-                            .Take(queryParameters.PageSize)
-                            .Select(x => new ResourceResponse()
-                            {
-                                Id = x.Id,
-                                Title = x.Title,
-                                FileType = x.FileType,
-                                FilePath = x.FilePath,
-                                CourseCount = x.CourseResources.Count,
-                                MentorName = x.Mentor.UserDetail.FullName,
-                                Description = x.Description
-                            });
-        var res = PaginationResult<ResourceResponse>.Create(data: await _resourceRepository.ToListAsync(queryPagination),
-                                                                  totalCount: await _resourceRepository.CountAsync(queryFilter),
-                                                                  pageNumber: queryParameters.PageNumber,
-                                                                  pageSize: queryParameters.PageSize);
+                var searchValue = queryParameters?.Search?.Trim();
+                var queryFilter = _resourceRepository.GetQueryable()
+                                .Where(x => queryParameters == null ||
+                                            (string.IsNullOrEmpty(searchValue) || x.Title.Contains(searchValue))
+                                            && (queryParameters!.FileType == null || x.FileType == queryParameters.FileType)
+                                            && ((selectedUser.Role == Role.Learner && learnerResourceIds.Contains(x.Id)) || x.MentorId == selectedUser.Id));
 
-        return Result<PaginationResult<ResourceResponse>>.Success(res);
+                var queryPagination = queryFilter
+                                    .Skip((queryParameters!.PageNumber - 1) * queryParameters.PageSize)
+                                    .Take(queryParameters.PageSize)
+                                    .Select(x => new ResourceResponse()
+                                    {
+                                        Id = x.Id,
+                                        Title = x.Title,
+                                        FileType = x.FileType,
+                                        FilePath = x.FilePath,
+                                        CourseCount = x.CourseResources.Count,
+                                        MentorName = x.Mentor.UserDetail.FullName,
+                                        Description = x.Description
+                                    });
+                var res = PaginationResult<ResourceResponse>.Create(data: await _resourceRepository.ToListAsync(queryPagination),
+                                                                          totalCount: await _resourceRepository.CountAsync(queryFilter),
+                                                                          pageNumber: queryParameters.PageNumber,
+                                                                          pageSize: queryParameters.PageSize);
+                return res;
+            });
+
+        return Result<PaginationResult<ResourceResponse>>.Success(result);
     }
 
     public async Task<Result> GetByIdAsync(Guid id)
@@ -201,6 +227,29 @@ public class ResourceServices : IResourceServices
         if (selectedUser!.Role == Role.Admin)
         {
             return Result.Failure(403, ResourceErrors.AdminCanNotViewResource);
+        }
+
+        // Try to get from cache
+        var cacheKey = CacheKeys.Resource(id);
+        var cachedResource = await _cacheService.GetAsync<ResourceDetailsResponse>(cacheKey);
+        
+        if (cachedResource != null && (selectedUser.Role == Role.Mentor && cachedResource.MentorId == userId || selectedUser.Role == Role.Learner))
+        {
+            // Additional permission check for learner from cache
+            if (selectedUser.Role == Role.Learner)
+            {
+                var learnerCoursesCacheKey = CacheKeys.LearnerResources(userId);
+                var learnerResourceIds = await _cacheService.GetAsync<List<Guid>>(learnerCoursesCacheKey);
+                
+                if (learnerResourceIds != null && learnerResourceIds.Contains(id))
+                {
+                    return Result<ResourceDetailsResponse>.Success(cachedResource);
+                }
+            }
+            else
+            {
+                return Result<ResourceDetailsResponse>.Success(cachedResource);
+            }
         }
 
         var query = _resourceRepository.GetQueryable()
@@ -239,7 +288,21 @@ public class ResourceServices : IResourceServices
             {
                 return Result.Failure(403, ResourceErrors.LearnerCanNotViewResource);
             }
+            
+            // Cache learner resources for quick permission checks
+            await _cacheService.SetAsync(
+                CacheKeys.LearnerResources(userId),
+                learnerCourses,
+                CacheConfiguration.PermissionData.AbsoluteExpiration,
+                CacheConfiguration.PermissionData.SlidingExpiration);
         }
+
+        // Cache the resource
+        await _cacheService.SetAsync(
+            cacheKey,
+            selectedResource,
+            CacheConfiguration.EntityData.AbsoluteExpiration,
+            CacheConfiguration.EntityData.SlidingExpiration);
 
         return Result<ResourceDetailsResponse>.Success(selectedResource);
     }

@@ -2,7 +2,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: mentorplatform-config
-  namespace: default
+  namespace: mentorplatform
 data:
   # Logging Configuration
   Logging__LogLevel__Default: "Information"
@@ -63,6 +63,45 @@ data:
   FileStorageOptions__MediaSettings__Documents__AllowedExtensions__7: ".txt"
   FileStorageOptions__MediaSettings__Documents__MaxSizeBytes: "10000000"
   FileStorageOptions__MediaSettings__Documents__FolderPath: "mentor-platform/documents"
+  
+  # Redis Cache Options
+  RedisOptions__Enabled: "true"
+  RedisOptions__InstanceName: "MentorPlatform:"
+  RedisOptions__AbsoluteExpirationMinutes: "60"
+  RedisOptions__SlidingExpirationMinutes: "30"
+  ConnectionStrings__Redis: "redis:6379"
+  
+  # Cache TTL Options - Static Data (rarely changes)
+  CacheTTLOptions__StaticData__AbsoluteExpirationMinutes: "1440"
+  CacheTTLOptions__StaticData__SlidingExpirationMinutes: "720"
+  
+  # Cache TTL Options - Lookup Data
+  CacheTTLOptions__LookupData__AbsoluteExpirationMinutes: "30"
+  CacheTTLOptions__LookupData__SlidingExpirationMinutes: "10"
+  
+  # Cache TTL Options - Paginated Data
+  CacheTTLOptions__PaginatedData__AbsoluteExpirationMinutes: "15"
+  CacheTTLOptions__PaginatedData__SlidingExpirationMinutes: "5"
+  
+  # Cache TTL Options - Entity Data
+  CacheTTLOptions__EntityData__AbsoluteExpirationMinutes: "30"
+  CacheTTLOptions__EntityData__SlidingExpirationMinutes: "10"
+  
+  # Cache TTL Options - Dashboard Data
+  CacheTTLOptions__DashboardData__AbsoluteExpirationMinutes: "30"
+  CacheTTLOptions__DashboardData__SlidingExpirationMinutes: "10"
+  
+  # Cache TTL Options - Schedule Data
+  CacheTTLOptions__ScheduleData__AbsoluteExpirationMinutes: "10"
+  CacheTTLOptions__ScheduleData__SlidingExpirationMinutes: "3"
+  
+  # Cache TTL Options - Volatile Data (real-time)
+  CacheTTLOptions__VolatileData__AbsoluteExpirationMinutes: "5"
+  CacheTTLOptions__VolatileData__SlidingExpirationMinutes: "2"
+  
+  # Cache TTL Options - Permission Data
+  CacheTTLOptions__PermissionData__AbsoluteExpirationMinutes: "15"
+  CacheTTLOptions__PermissionData__SlidingExpirationMinutes: "5"
   
   # ASP.NET Core Environment
   ASPNETCORE_ENVIRONMENT: "Production"

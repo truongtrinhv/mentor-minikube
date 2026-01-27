@@ -7,6 +7,7 @@ using MentorPlatform.Application.Commons.Models.Query;
 using MentorPlatform.Application.Commons.Models.Requests.MentoringSessionRequest;
 using MentorPlatform.Application.Commons.Models.Responses.MentoringSessionResponses;
 using MentorPlatform.Application.Identity;
+using MentorPlatform.Application.Services.Caching;
 using MentorPlatform.Application.Services.HostedServices;
 using MentorPlatform.Application.Services.Mail;
 using MentorPlatform.Domain.Entities;
@@ -28,6 +29,7 @@ public class MentoringSessionServices : IMentoringSessionServices
     private readonly IExecutionContext _executionContext;
     private readonly IBackgroundTaskQueue<Func<IServiceProvider, CancellationToken, ValueTask>> _mailQueue;
     private readonly IRazorLightEngine _razorLightEngine;
+    private readonly ICacheService _cacheService;
     public MentoringSessionServices(IMentoringSessionRepository mentoringSessionRepository,
                                     IUnitOfWork unitOfWork,
                                     IExecutionContext executionContext,
@@ -35,7 +37,8 @@ public class MentoringSessionServices : IMentoringSessionServices
                                     IUserRepository userRepository,
                                     ICourseRepository courseRepository,
                                     IBackgroundTaskQueue<Func<IServiceProvider, CancellationToken, ValueTask>> mailQueue,
-                                    IRazorLightEngine razorLightEngine)
+                                    IRazorLightEngine razorLightEngine,
+                                    ICacheService cacheService)
     {
         _mentoringSessionRepository = mentoringSessionRepository;
         _unitOfWork = unitOfWork;
@@ -45,31 +48,47 @@ public class MentoringSessionServices : IMentoringSessionServices
         _courseRepository = courseRepository;
         _mailQueue = mailQueue;
         _razorLightEngine = razorLightEngine;
+        _cacheService = cacheService;
     }
 
     public async Task<Result> GetAvailableSchedulesAsync(ScheduleQueryParameters queryParameters)
     {
+        if (queryParameters.MentorId is null)
+        {
+            return Result.Failure(MentoringSessionErrors.MentorNotExists);
+        }
+
         var queryCheckMentor = _userRepository.GetQueryable()
                                                 .Where(x => x.Id == queryParameters.MentorId && x.Role == Role.Mentor);
         if (!await _userRepository.AnyAsync(queryCheckMentor))
         {
             return Result.Failure(404, MentoringSessionErrors.MentorNotExists);
         }
-        var querySchedules = _scheduleRepository.GetQueryable()
-                                                .Where(x => x.MentorId == queryParameters.MentorId
-                                                            && x.StartTime >= queryParameters.StartDate && x.StartTime <= queryParameters.EndDate
-                                                            && (x.MentoringSessions == null || x.MentoringSessions.All(y => y.RequestStatus == RequestMentoringSessionStatus.Cancelled)));
+        
+        var cacheKey = CacheKeys.AvailableSchedulesByDateRange(queryParameters.MentorId.Value, queryParameters.StartDate, queryParameters.EndDate);
+        
+        var result = await _cacheService.GetOrSetVolatileAsync(
+            cacheKey,
+            async () =>
+            {
+                var querySchedules = _scheduleRepository.GetQueryable()
+                                                        .Where(x => x.MentorId == queryParameters.MentorId
+                                                                    && x.StartTime >= queryParameters.StartDate && x.StartTime <= queryParameters.EndDate
+                                                                    && (x.MentoringSessions == null || x.MentoringSessions.All(y => y.RequestStatus == RequestMentoringSessionStatus.Cancelled)));
 
 
-        var selectedSchedules = await _scheduleRepository.ToListAsync(querySchedules);
-        var res = selectedSchedules.Select(x => new ScheduleLookup
-        {
-            Id = x.Id,
-            StartTime = x.StartTime,
-            EndTime = x.EndTime
-        }).ToList();
+                var selectedSchedules = await _scheduleRepository.ToListAsync(querySchedules);
+                var res = selectedSchedules.Select(x => new ScheduleLookup
+                {
+                    Id = x.Id,
+                    StartTime = x.StartTime,
+                    EndTime = x.EndTime
+                }).ToList();
+                
+                return res;
+            });
 
-        return Result<List<ScheduleLookup>>.Success(res);
+        return Result<List<ScheduleLookup>>.Success(result ?? []);
     }
 
     public async Task<Result> CreateAsync(CreateSessionRequest sessionRequest)
@@ -112,6 +131,14 @@ public class MentoringSessionServices : IMentoringSessionServices
         };
         _mentoringSessionRepository.Add(mentoringSession);
         await _unitOfWork.SaveChangesAsync();
+        
+        // Invalidate schedule and session caches
+        await _cacheService.RemoveAsync(CacheKeys.Schedule(selectedSchedule.Id));
+        await _cacheService.RemoveByPrefixAsync(CacheKeys.SchedulesByMentor(selectedSchedule.MentorId));
+        await _cacheService.RemoveByPrefixAsync(CacheKeys.AvailableSchedules(selectedSchedule.MentorId));
+        await _cacheService.RemoveByPrefixAsync(CacheKeys.SessionsByMentor(selectedSchedule.MentorId));
+        await _cacheService.RemoveByPrefixAsync(CacheKeys.SessionsByLearner(selectedUser.Id));
+        
         await SendBookingConfirmationEmailAsync(selectedSchedule.MentorId, selectedUser.Id, selectedSchedule, selectedCourse, mentoringSession.SessionType);
         return Result<string>.Success(MentoringSessionCommandMessages.CreateSuccessfully, 201);
     }
@@ -460,6 +487,13 @@ public class MentoringSessionServices : IMentoringSessionServices
         session.RequestStatus = RequestMentoringSessionStatus.Scheduled;
         await _unitOfWork.SaveChangesAsync();
         
+        // Invalidate session and schedule caches
+        await _cacheService.RemoveAsync(CacheKeys.Session(sessionId));
+        await _cacheService.RemoveByPrefixAsync(CacheKeys.SessionsByMentor(session.Schedule.MentorId));
+        await _cacheService.RemoveByPrefixAsync(CacheKeys.SessionsByLearner(session.LearnerId));
+        await _cacheService.RemoveByPrefixAsync(CacheKeys.AvailableSchedules(session.Schedule.MentorId));
+        await _cacheService.RemoveByPrefixAsync(CacheKeys.SchedulesByMentor(session.Schedule.MentorId));
+        
         // Send email notification approval
         await SendApprovalEmailAsync(
             session.Schedule.MentorId, 
@@ -497,6 +531,13 @@ public class MentoringSessionServices : IMentoringSessionServices
 
         session.RequestStatus = RequestMentoringSessionStatus.Cancelled;
         await _unitOfWork.SaveChangesAsync();
+        
+        // Invalidate session and schedule caches
+        await _cacheService.RemoveAsync(CacheKeys.Session(sessionId));
+        await _cacheService.RemoveByPrefixAsync(CacheKeys.SessionsByMentor(session.Schedule.MentorId));
+        await _cacheService.RemoveByPrefixAsync(CacheKeys.SessionsByLearner(session.LearnerId));
+        await _cacheService.RemoveByPrefixAsync(CacheKeys.AvailableSchedules(session.Schedule.MentorId));
+        await _cacheService.RemoveByPrefixAsync(CacheKeys.SchedulesByMentor(session.Schedule.MentorId));
         
         // Send email notification rejection
         await SendRejectionEmailAsync(
@@ -560,6 +601,15 @@ public class MentoringSessionServices : IMentoringSessionServices
 
         await _unitOfWork.SaveChangesAsync();
         
+        // Invalidate session and schedule caches (both old and new schedules)
+        await _cacheService.RemoveAsync(CacheKeys.Session(sessionId));
+        await _cacheService.RemoveByPrefixAsync(CacheKeys.SessionsByMentor(session.Schedule.MentorId));
+        await _cacheService.RemoveByPrefixAsync(CacheKeys.SessionsByLearner(session.LearnerId));
+        await _cacheService.RemoveByPrefixAsync(CacheKeys.AvailableSchedules(session.Schedule.MentorId));
+        await _cacheService.RemoveByPrefixAsync(CacheKeys.SchedulesByMentor(session.Schedule.MentorId));
+        await _cacheService.RemoveAsync(CacheKeys.Schedule(oldSchedule.Id));
+        await _cacheService.RemoveAsync(CacheKeys.Schedule(newSchedule.Id));
+        
         // Send email notification reschedule
         await SendRescheduleEmailAsync(
             session.Schedule.MentorId, 
@@ -598,6 +648,11 @@ public class MentoringSessionServices : IMentoringSessionServices
 
         session.RequestStatus = RequestMentoringSessionStatus.Completed;
         await _unitOfWork.SaveChangesAsync();
+        
+        // Invalidate session caches
+        await _cacheService.RemoveAsync(CacheKeys.Session(sessionId));
+        await _cacheService.RemoveByPrefixAsync(CacheKeys.SessionsByMentor(session.Schedule.MentorId));
+        await _cacheService.RemoveByPrefixAsync(CacheKeys.SessionsByLearner(session.LearnerId));
         
         // Send email notification completion
         await SendCompletionEmailAsync(

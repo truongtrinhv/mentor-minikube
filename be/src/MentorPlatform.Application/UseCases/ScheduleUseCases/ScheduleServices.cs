@@ -6,6 +6,7 @@ using MentorPlatform.Application.Commons.Models.Query;
 using MentorPlatform.Application.Commons.Models.Requests.ScheduleRequests;
 using MentorPlatform.Application.Commons.Models.Responses.ScheduleResponses;
 using MentorPlatform.Application.Identity;
+using MentorPlatform.Application.Services.Caching;
 using MentorPlatform.Domain.Entities;
 using MentorPlatform.Domain.Enums;
 using MentorPlatform.Domain.Repositories;
@@ -18,17 +19,23 @@ public class ScheduleServices : IScheduleServices
     private readonly IScheduleRepository _scheduleRepository;
     private readonly IExecutionContext _executionContext;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly ICacheService _cacheService;
+    private readonly CacheInvalidationHelper _cacheInvalidation;
 
     public ScheduleServices(
         IScheduleRepository scheduleRepository,
         IExecutionContext executionContext,
         IUnitOfWork unitOfWork,
-        IUserRepository userRepository
+        IUserRepository userRepository,
+        ICacheService cacheService,
+        CacheInvalidationHelper cacheInvalidation
         )
     {
         _scheduleRepository = scheduleRepository;
         _executionContext = executionContext;
         _unitOfWork = unitOfWork;
+        _cacheService = cacheService;
+        _cacheInvalidation = cacheInvalidation;
     }
 
     public async Task<Result> GetSchedulesAsync(ScheduleQueryParameters queryParameters)
@@ -41,49 +48,58 @@ public class ScheduleServices : IScheduleServices
             return Result.Failure(ScheduleErrors.MentorAccessRequired);
         }
 
-        var allDates = Enumerable.Range(0, (int)(queryParameters.EndDate.Date - queryParameters.StartDate.Date).TotalDays + 1)
-            .Select(offset => queryParameters.StartDate.Date.AddDays(offset))
-            .ToList();
-
-        var scheduleQuery = _scheduleRepository.GetQueryable()
-            .Where(s => s.MentorId == userId &&
-                    s.StartTime >= queryParameters.StartDate &&
-                    s.StartTime <= queryParameters.EndDate)
-            .Select(s => new TimeSlotResponse
+        var cacheKey = CacheKeys.SchedulesByDateRange(userId, queryParameters.StartDate, queryParameters.EndDate);
+        
+        var result = await _cacheService.GetOrSetScheduleAsync(
+            cacheKey,
+            async () =>
             {
-                Id = s.Id,
-                StartTime = s.StartTime,
-                EndTime = s.EndTime,
-                Status = s.MentoringSessions != null &&
-                        s.MentoringSessions.Any(ms => ms.RequestStatus != RequestMentoringSessionStatus.Cancelled)
-                        ? TimeSlotStatus.Unavailable
-                        : TimeSlotStatus.Available
+                var allDates = Enumerable.Range(0, (int)(queryParameters.EndDate.Date - queryParameters.StartDate.Date).TotalDays + 1)
+                    .Select(offset => queryParameters.StartDate.Date.AddDays(offset))
+                    .ToList();
+
+                var scheduleQuery = _scheduleRepository.GetQueryable()
+                    .Where(s => s.MentorId == userId &&
+                            s.StartTime >= queryParameters.StartDate &&
+                            s.StartTime <= queryParameters.EndDate)
+                    .Select(s => new TimeSlotResponse
+                    {
+                        Id = s.Id,
+                        StartTime = s.StartTime,
+                        EndTime = s.EndTime,
+                        Status = s.MentoringSessions != null &&
+                                s.MentoringSessions.Any(ms => ms.RequestStatus != RequestMentoringSessionStatus.Cancelled)
+                                ? TimeSlotStatus.Unavailable
+                                : TimeSlotStatus.Available
+                    });
+
+                var allSchedules = await _scheduleRepository.ToListAsync(scheduleQuery);
+
+                var schedulesByDate = allSchedules
+                    .GroupBy(s => s.StartTime.Date)
+                    .ToDictionary(
+                        g => g.Key,
+                        g => new DayTimeSlotsResponse
+                        {
+                            Date = g.Key,
+                            TimeSlots = g.OrderBy(s => s.StartTime).ToList()
+                        }
+                    );
+
+                var response = allDates.Select(date =>
+                    schedulesByDate.TryGetValue(date, out var daySchedule)
+                        ? daySchedule
+                        : new DayTimeSlotsResponse
+                        {
+                            Date = date,
+                            TimeSlots = new List<TimeSlotResponse>()
+                        }
+                ).ToList();
+                
+                return response;
             });
 
-        var allSchedules = await _scheduleRepository.ToListAsync(scheduleQuery);
-
-        var schedulesByDate = allSchedules
-            .GroupBy(s => s.StartTime.Date)
-            .ToDictionary(
-                g => g.Key,
-                g => new DayTimeSlotsResponse
-                {
-                    Date = g.Key,
-                    TimeSlots = g.OrderBy(s => s.StartTime).ToList()
-                }
-            );
-
-        var response = allDates.Select(date =>
-            schedulesByDate.TryGetValue(date, out var daySchedule)
-                ? daySchedule
-                : new DayTimeSlotsResponse
-                {
-                    Date = date,
-                    TimeSlots = new List<TimeSlotResponse>()
-                }
-        ).ToList();
-
-        return Result<List<DayTimeSlotsResponse>>.Success(response);
+        return Result<List<DayTimeSlotsResponse>>.Success(result);
     }
 
     public async Task<Result> AddScheduleAsync(CreateScheduleRequest request)
@@ -130,6 +146,12 @@ public class ScheduleServices : IScheduleServices
         _scheduleRepository.AddRange(scheduleList);
         await _unitOfWork.SaveChangesAsync();
 
+        // Invalidate schedule caches using helper
+        await Task.WhenAll(
+            _cacheService.RemoveByPrefixAsync(CacheKeys.SchedulesByMentor(userId)),
+            _cacheService.RemoveByPrefixAsync(CacheKeys.AvailableSchedules(userId))
+        );
+
         return Result<string>.Success(ScheduleCommandMessages.CreateSuccessfully);
     }
 
@@ -155,6 +177,9 @@ public class ScheduleServices : IScheduleServices
 
         _scheduleRepository.Remove(schedule);
         await _unitOfWork.SaveChangesAsync();
+
+        // Invalidate schedule caches using helper
+        await _cacheInvalidation.InvalidateScheduleCachesAsync(scheduleId, userId);
 
         return Result<string>.Success(ScheduleCommandMessages.DeleteSuccessfully);
     }
@@ -185,6 +210,9 @@ public class ScheduleServices : IScheduleServices
         selectedSchedule.EndTime = request.TimeBlock.EndTime;
         _scheduleRepository.Update(selectedSchedule);
         await _unitOfWork.SaveChangesAsync();
+
+        // Invalidate schedule caches using helper
+        await _cacheInvalidation.InvalidateScheduleCachesAsync(id, userId);
 
         return Result<string>.Success(ScheduleCommandMessages.UpdateSuccessfully);
     }

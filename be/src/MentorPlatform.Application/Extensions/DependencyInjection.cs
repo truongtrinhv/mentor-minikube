@@ -1,4 +1,5 @@
 ﻿using FluentValidation;
+using MentorPlatform.Application.Services.Caching;
 using MentorPlatform.Application.Services.Security;
 using MentorPlatform.Application.UseCases.AdminDashboardUseCases;
 using MentorPlatform.Application.UseCases.ApplicationRequestUseCases;
@@ -26,8 +27,17 @@ public static class DependencyInjection
     public static IServiceCollection ConfigureApplicationLayer(this IServiceCollection services)
     {
         return services.ConfigureUseCases()
+            .ConfigureCaching()
             .ConfigureJwtTokenOptions()
             .ConfigureFluentValidation();
+    }
+
+    public static IServiceCollection ConfigureCaching(this IServiceCollection services)
+    {
+        // CacheService is registered in Infrastructure layer via DependencyInjection
+        // Here we just ensure ICacheService is available
+        services.AddScoped<CacheInvalidationHelper>();
+        return services;
     }
 
     public static IServiceCollection ConfigureUseCases(this IServiceCollection services)

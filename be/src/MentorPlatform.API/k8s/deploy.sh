@@ -15,13 +15,16 @@ echo -e "${GREEN}========================================${NC}"
 # Configuration
 IMAGE_NAME="mentorplatform-api"
 IMAGE_TAG="latest"
-NAMESPACE="default"
+NAMESPACE="mentorplatform"
 
 # Navigate to the solution directory
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 cd "$SCRIPT_DIR/.."
 
-echo -e "\n${YELLOW}Step 1: Building Docker image...${NC}"
+echo -e "\n${YELLOW}Step 1: Creating namespace...${NC}"
+kubectl create namespace ${NAMESPACE} --dry-run=client -o yaml | kubectl apply -f -
+
+echo -e "\n${YELLOW}Step 2: Building Docker image...${NC}"
 docker build -t ${IMAGE_NAME}:${IMAGE_TAG} -f Dockerfile ../
 
 if [ $? -eq 0 ]; then
@@ -31,9 +34,17 @@ else
     exit 1
 fi
 
-echo -e "\n${YELLOW}Step 2: Applying Kubernetes configurations...${NC}"
+echo -e "\n${YELLOW}Step 3: Applying Kubernetes configurations...${NC}"
 
-# Apply database first
+# Deploy Redis cache first
+echo -e "${YELLOW}Deploying Redis cache...${NC}"
+kubectl apply -f k8s/redis.yaml -n ${NAMESPACE}
+
+# Wait for Redis to be ready
+echo -e "${YELLOW}Waiting for Redis to be ready...${NC}"
+kubectl wait --for=condition=available deployment/redis -n ${NAMESPACE} --timeout=180s || true
+
+# Apply database
 echo -e "${YELLOW}Deploying SQL Server database...${NC}"
 kubectl apply -f k8s/database.yaml -n ${NAMESPACE}
 
@@ -49,7 +60,7 @@ kubectl apply -f k8s/configmap.yaml -n ${NAMESPACE}
 echo -e "${YELLOW}Applying Secret...${NC}"
 kubectl apply -f k8s/secret.yaml -n ${NAMESPACE}
 
-# Apply Deployment
+# Apply Deployment4
 echo -e "${YELLOW}Applying Deployment...${NC}"
 kubectl apply -f k8s/deployment.yaml -n ${NAMESPACE}
 

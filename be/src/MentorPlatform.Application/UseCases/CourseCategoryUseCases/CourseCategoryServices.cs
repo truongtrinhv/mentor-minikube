@@ -4,6 +4,7 @@ using MentorPlatform.Application.Commons.Models.Lookup;
 using MentorPlatform.Application.Commons.Models.Query;
 using MentorPlatform.Application.Commons.Models.Requests.CourseCategoryRequests;
 using MentorPlatform.Application.Commons.Models.Responses.CourseCategory;
+using MentorPlatform.Application.Services.Caching;
 using MentorPlatform.Domain.Repositories;
 using MentorPlatform.Domain.Shared;
 
@@ -12,79 +13,108 @@ public class CourseCategoryServices : ICourseCategoryServices
 {
     private readonly ICourseCategoryRepository _courseCategoryRepository;
     private readonly IUnitOfWork _unitOfWork;
-    public CourseCategoryServices(ICourseCategoryRepository courseCategoryRepository, IUnitOfWork unitOfWork)
+    private readonly ICacheService _cache;
+
+    public CourseCategoryServices(
+        ICourseCategoryRepository courseCategoryRepository, 
+        IUnitOfWork unitOfWork,
+        ICacheService cache)
     {
         _courseCategoryRepository = courseCategoryRepository;
         _unitOfWork = unitOfWork;
+        _cache = cache;
     }
 
 
     public async Task<Result> GetLookupAsync()
     {
-        var query = _courseCategoryRepository.GetQueryable()
-                        .Where(x => x.IsActive)
-                        .Select(x => new LookupModel()
-                        {
-                            Id = x.Id,
-                            Name = x.Name
-                        });
-        var res = await _courseCategoryRepository.ToListAsync(query);
-        return Result<List<LookupModel>>.Success(res);
+        return await _cache.GetOrSetLookupAsync(
+            CacheKeys.CourseCategoriesLookup,
+            async () =>
+            {
+                var query = _courseCategoryRepository.GetQueryable()
+                                .Where(x => x.IsActive)
+                                .Select(x => new LookupModel()
+                                {
+                                    Id = x.Id,
+                                    Name = x.Name
+                                });
+                var res = await _courseCategoryRepository.ToListAsync(query);
+                return Result<List<LookupModel>>.Success(res);
+            }
+        );
     }
 
     public async Task<Result> GetAllAsync(QueryParameters queryParameters)
     {
-        var searchValue = queryParameters?.Search?.Trim();
-        var queryAll = _courseCategoryRepository.GetQueryable()
-                        .Where(x => string.IsNullOrEmpty(searchValue)
-                                    || x.Name.Contains(searchValue)
-                                    || x.Description.Contains(searchValue));
-        var queryPagination = queryAll
-                            .Skip((queryParameters.PageNumber - 1) * queryParameters.PageSize)
-                            .Take(queryParameters.PageSize)
-                            .Select(x => new CourseCategoryResponse()
-                            {
-                                Id = x.Id,
-                                Name = x.Name,
-                                Description = x.Description,
-                                CourseCount = x.Courses != null ? x.Courses.Count : 0,
-                                IsActive = x.IsActive
-                            });
-        var res = PaginationResult<CourseCategoryResponse>.Create(data: await _courseCategoryRepository.ToListAsync(queryPagination),
-                                                                  totalCount: await _courseCategoryRepository.CountAsync(queryAll),
-                                                                  pageNumber: queryParameters.PageNumber,
-                                                                  pageSize: queryParameters.PageSize);
+        var cacheKey = CacheKeys.CourseCategoryPage(
+            queryParameters.PageNumber, 
+            queryParameters.PageSize, 
+            queryParameters.Search);
 
-        return Result<PaginationResult<CourseCategoryResponse>>.Success(res);
+        return await _cache.GetOrSetPaginatedAsync(
+            cacheKey,
+            async () =>
+            {
+                var searchValue = queryParameters?.Search?.Trim();
+                var queryAll = _courseCategoryRepository.GetQueryable()
+                                .Where(x => string.IsNullOrEmpty(searchValue)
+                                            || x.Name.Contains(searchValue)
+                                            || x.Description.Contains(searchValue));
+                var queryPagination = queryAll
+                                    .Skip((queryParameters.PageNumber - 1) * queryParameters.PageSize)
+                                    .Take(queryParameters.PageSize)
+                                    .Select(x => new CourseCategoryResponse()
+                                    {
+                                        Id = x.Id,
+                                        Name = x.Name,
+                                        Description = x.Description,
+                                        CourseCount = x.Courses != null ? x.Courses.Count : 0,
+                                        IsActive = x.IsActive
+                                    });
+                var res = PaginationResult<CourseCategoryResponse>.Create(
+                    data: await _courseCategoryRepository.ToListAsync(queryPagination),
+                    totalCount: await _courseCategoryRepository.CountAsync(queryAll),
+                    pageNumber: queryParameters.PageNumber,
+                    pageSize: queryParameters.PageSize);
+
+                return Result<PaginationResult<CourseCategoryResponse>>.Success(res);
+            }
+        );
     }
 
     public async Task<Result> GetByIdAsync(Guid id)
     {
-        var query = _courseCategoryRepository.GetQueryable()
-                                                .Where(x => x.Id == id)
-                                                .Select(x => new CourseCategoryDetailResponse()
-                                                {
-                                                    Id = x.Id,
-                                                    Name = x.Name,
-                                                    Description = x.Description,
-                                                    CourseCount = x.Courses != null ? x.Courses.Count : 0,
-                                                    IsActive = x.IsActive,
-                                                    Courses = x.Courses != null ? x.Courses.Select(c => new CourseInforForCategoryResponse()
-                                                    {
-                                                        Id = c.Id,
-                                                        Title = c.Title,
-                                                        Description = c.Description,
-                                                        Level = c.Level
-                                                    }).ToList() : new List<CourseInforForCategoryResponse>()
-                                                });
+        return await _cache.GetOrSetEntityAsync(
+            CacheKeys.CourseCategory(id),
+            async () =>
+            {
+                var query = _courseCategoryRepository.GetQueryable()
+                                                        .Where(x => x.Id == id)
+                                                        .Select(x => new CourseCategoryDetailResponse()
+                                                        {
+                                                            Id = x.Id,
+                                                            Name = x.Name,
+                                                            Description = x.Description,
+                                                            CourseCount = x.Courses != null ? x.Courses.Count : 0,
+                                                            IsActive = x.IsActive,
+                                                            Courses = x.Courses != null ? x.Courses.Select(c => new CourseInforForCategoryResponse()
+                                                            {
+                                                                Id = c.Id,
+                                                                Title = c.Title,
+                                                                Description = c.Description,
+                                                                Level = c.Level
+                                                            }).ToList() : new List<CourseInforForCategoryResponse>()
+                                                        });
 
-        var selectedCategory = await _courseCategoryRepository.FirstOrDefaultAsync(query);
-        if (selectedCategory == null)
-        {
-            return Result.Failure(404, CourseCategoryErrors.CourseCategoryNotExists);
-        }
-        return Result<CourseCategoryDetailResponse>.Success(selectedCategory);
-
+                var selectedCategory = await _courseCategoryRepository.FirstOrDefaultAsync(query);
+                if (selectedCategory == null)
+                {
+                    return Result.Failure(404, CourseCategoryErrors.CourseCategoryNotExists);
+                }
+                return Result<CourseCategoryDetailResponse>.Success(selectedCategory);
+            }
+        );
     }
 
     public async Task<Result> CreateAsync(CreateCourseCategoryRequest createRequest)
@@ -103,6 +133,11 @@ public class CourseCategoryServices : ICourseCategoryServices
         _courseCategoryRepository.Add(newEntity);
 
         await _unitOfWork.SaveChangesAsync();
+
+        // Invalidate all category caches
+        await _cache.RemoveAsync(CacheKeys.CourseCategoriesLookup);
+        await _cache.RemoveAsync(CacheKeys.CourseCategoriesAll);
+
         return Result<string>.Success(CourseCategoryCommandMessages.CreatedSuccessfully, 201);
     }
 
@@ -135,9 +170,16 @@ public class CourseCategoryServices : ICourseCategoryServices
         selectedCategory.IsActive = updateRequest.IsActive;
         _courseCategoryRepository.Update(selectedCategory);
         await _unitOfWork.SaveChangesAsync();
+
+        // Invalidate caches
+        await _cache.RemoveAsync(CacheKeys.CourseCategory(id));
+        await _cache.RemoveAsync(CacheKeys.CourseCategoriesLookup);
+        await _cache.RemoveAsync(CacheKeys.CourseCategoriesAll);
+
         return Result<string>.Success(CourseCategoryCommandMessages.UpdatedSuccessfully, 204);
 
     }
+
     public async Task<Result> DeleteAsync(Guid id)
     {
         var selectedCategory = await _courseCategoryRepository.GetByIdAsync(id, nameof(Domain.Entities.CourseCategory.UserCourseCategories), nameof(Domain.Entities.CourseCategory.Courses));
@@ -153,6 +195,12 @@ public class CourseCategoryServices : ICourseCategoryServices
 
         _courseCategoryRepository.Remove(selectedCategory);
         await _unitOfWork.SaveChangesAsync();
+
+        // Invalidate caches
+        await _cache.RemoveAsync(CacheKeys.CourseCategory(id));
+        await _cache.RemoveAsync(CacheKeys.CourseCategoriesLookup);
+        await _cache.RemoveAsync(CacheKeys.CourseCategoriesAll);
+
         return Result<string>.Success(CourseCategoryCommandMessages.DeletedSuccessfully, 204);
     }
 

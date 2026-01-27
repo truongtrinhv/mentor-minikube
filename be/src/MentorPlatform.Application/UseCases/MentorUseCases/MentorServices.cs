@@ -7,6 +7,7 @@ using MentorPlatform.Application.Commons.Models.Responses.MentoringSessionRespon
 using MentorPlatform.Application.Commons.Models.Responses.MentorResponses;
 using MentorPlatform.Application.Commons.Models.Responses.NotificationResponses;
 using MentorPlatform.Application.Identity;
+using MentorPlatform.Application.Services.Caching;
 using MentorPlatform.Domain.Entities;
 using MentorPlatform.Domain.Enums;
 using MentorPlatform.Domain.Repositories;
@@ -22,6 +23,7 @@ public class MentorServices : IMentorServices
     private readonly IExecutionContext _executionContext;
     private readonly IMentoringSessionRepository _sessionRepository;
     private readonly INotificationRepository _notificationRepository;
+    private readonly ICacheService _cacheService;
 
     public MentorServices(
         IUserRepository userRepository,
@@ -29,7 +31,8 @@ public class MentorServices : IMentorServices
         IUnitOfWork unitOfWork,
         IExecutionContext executionContext,
         IMentoringSessionRepository sessionRepository,
-        INotificationRepository notificationRepository)
+        INotificationRepository notificationRepository,
+        ICacheService cacheService)
     {
         _userRepository = userRepository;
         _courseRepository = courseRepository;
@@ -37,6 +40,7 @@ public class MentorServices : IMentorServices
         _executionContext = executionContext;
         _sessionRepository = sessionRepository;
         _notificationRepository = notificationRepository;
+        _cacheService = cacheService;
     }
 
     public async Task<Result> GetAllMentorsWithCoursesAsync(MentorQueryParameters queryParameters)
@@ -44,89 +48,97 @@ public class MentorServices : IMentorServices
         try
         {
             var searchValue = queryParameters?.Search?.Trim();
-
-            var mentorsQuery = _userRepository.GetQueryable()
-                .Where(u => u.Role == Role.Mentor && !u.IsDeleted);
-
-            if (!string.IsNullOrEmpty(searchValue))
-            {
-                mentorsQuery = mentorsQuery.Where(m =>
-                    m.UserDetail.FullName.Contains(searchValue) ||
-                    m.Email.Contains(searchValue));
-            }
-
-            var mentors = await _userRepository.ToListAsync(
-                mentorsQuery
-                    .Skip((queryParameters!.PageNumber - 1) * queryParameters.PageSize)
-                    .Take(queryParameters.PageSize)
-                    .Select(m => new MentorWithCoursesResponse
-                    {
-                        Id = m.Id,
-                        FullName = m.UserDetail.FullName,
-                        Email = m.Email,
-                        AvatarUrl = m.UserDetail.AvatarUrl,
-                        Expertise = m.UserExpertises != null && m.UserExpertises.Any()
-                            ? m.UserExpertises.Select(ue => ue.Expertise.Name).ToList()
-                            : new List<string>(),
-                        Bio = m.UserDetail.Bio,
-                        Courses = new List<CourseDetailsResponse>()
-                    }));
-
-            foreach (var mentor in mentors)
-            {
-                var coursesQuery = _courseRepository.GetQueryable()
-                    .Where(c => c.MentorId == mentor.Id && !c.IsDeleted);
-
-                if (queryParameters?.CategoryId.HasValue == true)
+            var cacheKey = CacheKeys.MentorsWithCoursesPage(queryParameters!.PageNumber, queryParameters.PageSize, searchValue, queryParameters?.CategoryId);
+            
+            var result = await _cacheService.GetOrSetPaginatedAsync(
+                cacheKey,
+                async () =>
                 {
-                    coursesQuery = coursesQuery.Where(c => c.CourseCategoryId == queryParameters.CategoryId.Value);
-                }
+                    var mentorsQuery = _userRepository.GetQueryable()
+                        .Where(u => u.Role == Role.Mentor && !u.IsDeleted);
 
-                mentor.Courses = await _courseRepository.ToListAsync(
-                    coursesQuery.Select(c => new CourseDetailsResponse
+                    if (!string.IsNullOrEmpty(searchValue))
                     {
-                        Id = c.Id,
-                        Title = c.Title,
-                        Description = c.Description,
-                        Level = c.Level,
-                        LearnerCount = c.MentoringSessions != null ? c.MentoringSessions.GroupBy(s => s.LearnerId).Count() : 0,
-                        Category = new CourseDetailsCategoryResponse
+                        mentorsQuery = mentorsQuery.Where(m =>
+                            m.UserDetail.FullName.Contains(searchValue) ||
+                            m.Email.Contains(searchValue));
+                    }
+
+                    var mentors = await _userRepository.ToListAsync(
+                        mentorsQuery
+                            .Skip((queryParameters!.PageNumber - 1) * queryParameters.PageSize)
+                            .Take(queryParameters.PageSize)
+                            .Select(m => new MentorWithCoursesResponse
+                            {
+                                Id = m.Id,
+                                FullName = m.UserDetail.FullName,
+                                Email = m.Email,
+                                AvatarUrl = m.UserDetail.AvatarUrl,
+                                Expertise = m.UserExpertises != null && m.UserExpertises.Any()
+                                    ? m.UserExpertises.Select(ue => ue.Expertise.Name).ToList()
+                                    : new List<string>(),
+                                Bio = m.UserDetail.Bio,
+                                Courses = new List<CourseDetailsResponse>()
+                            }));
+
+                    foreach (var mentor in mentors)
+                    {
+                        var coursesQuery = _courseRepository.GetQueryable()
+                            .Where(c => c.MentorId == mentor.Id && !c.IsDeleted);
+
+                        if (queryParameters?.CategoryId.HasValue == true)
                         {
-                            Id = c.CourseCategory.Id,
-                            Name = c.CourseCategory.Name
-                        },
-                        Mentor = new MentorInfoForCourseResponse
-                        {
-                            Id = mentor.Id,
-                            FullName = mentor.FullName,
-                            AvatarUrl = mentor.AvatarUrl,
-                            Email = mentor.Email,
-                            Experience = c.Mentor.UserDetail.Experience,
-                            Expertises = c.Mentor.UserExpertises != null && c.Mentor.UserExpertises.Any()
-                                ? c.Mentor.UserExpertises.Select(ue => new LookupModel
-                                {
-                                    Id = ue.ExpertiseId,
-                                    Name = ue.Expertise.Name
-                                }).ToList()
-                                : new List<LookupModel>()
+                            coursesQuery = coursesQuery.Where(c => c.CourseCategoryId == queryParameters.CategoryId.Value);
                         }
-                    }));
-            }
 
-            if (queryParameters?.CategoryId.HasValue == true)
-            {
-                mentors = mentors.Where(m => m.Courses.Any()).ToList();
-            }
+                        mentor.Courses = await _courseRepository.ToListAsync(
+                            coursesQuery.Select(c => new CourseDetailsResponse
+                            {
+                                Id = c.Id,
+                                Title = c.Title,
+                                Description = c.Description,
+                                Level = c.Level,
+                                LearnerCount = c.MentoringSessions != null ? c.MentoringSessions.GroupBy(s => s.LearnerId).Count() : 0,
+                                Category = new CourseDetailsCategoryResponse
+                                {
+                                    Id = c.CourseCategory.Id,
+                                    Name = c.CourseCategory.Name
+                                },
+                                Mentor = new MentorInfoForCourseResponse
+                                {
+                                    Id = mentor.Id,
+                                    FullName = mentor.FullName,
+                                    AvatarUrl = mentor.AvatarUrl,
+                                    Email = mentor.Email,
+                                    Experience = c.Mentor.UserDetail.Experience,
+                                    Expertises = c.Mentor.UserExpertises != null && c.Mentor.UserExpertises.Any()
+                                        ? c.Mentor.UserExpertises.Select(ue => new LookupModel
+                                        {
+                                            Id = ue.ExpertiseId,
+                                            Name = ue.Expertise.Name
+                                        }).ToList()
+                                        : new List<LookupModel>()
+                                }
+                            }));
+                    }
 
-            var totalCount = await _userRepository.CountAsync(mentorsQuery);
+                    if (queryParameters?.CategoryId.HasValue == true)
+                    {
+                        mentors = mentors.Where(m => m.Courses.Any()).ToList();
+                    }
 
-            var paginationResult = PaginationResult<MentorWithCoursesResponse>.Create(
-                data: mentors,
-                totalCount: totalCount,
-                pageNumber: queryParameters!.PageNumber,
-                pageSize: queryParameters.PageSize);
+                    var totalCount = await _userRepository.CountAsync(mentorsQuery);
 
-            return Result<PaginationResult<MentorWithCoursesResponse>>.Success(paginationResult);
+                    var paginationResult = PaginationResult<MentorWithCoursesResponse>.Create(
+                        data: mentors,
+                        totalCount: totalCount,
+                        pageNumber: queryParameters!.PageNumber,
+                        pageSize: queryParameters.PageSize);
+                    
+                    return paginationResult;
+                });
+
+            return Result<PaginationResult<MentorWithCoursesResponse>>.Success(result);
         }
         catch (Exception ex)
         {
@@ -143,20 +155,28 @@ public class MentorServices : IMentorServices
         }
 
         var userId = _executionContext.GetUserId();
+        var cacheKey = CacheKeys.MentorTopCourses(userId, courseNumber);
+        
+        var result = await _cacheService.GetOrSetDashboardAsync(
+            cacheKey,
+            async () =>
+            {
+                var coursesQuery = _courseRepository.GetQueryable()
+                    .Where(c => c.MentorId == userId);
 
-        var coursesQuery = _courseRepository.GetQueryable()
-            .Where(c => c.MentorId == userId);
+                var courses = await _courseRepository
+                    .ToListAsync(coursesQuery, nameof(Course.CourseCategory), nameof(Course.MentoringSessions));
 
-        var courses = await _courseRepository
-            .ToListAsync(coursesQuery, nameof(Course.CourseCategory), nameof(Course.MentoringSessions));
-
-        var topCourses = courses.Select(c => c.ToResponse(c.MentoringSessions
-                                                .GroupBy(ms => ms.LearnerId)
-                                                .Count()))
-                                .OrderByDescending(c => c.LearnerCount)
-                                .Take(courseNumber)
-                                .ToList();
-        return Result<List<CourseResponse>>.Success(topCourses);
+                var topCourses = courses.Select(c => c.ToResponse(c.MentoringSessions
+                                                        .GroupBy(ms => ms.LearnerId)
+                                                        .Count()))
+                                        .OrderByDescending(c => c.LearnerCount)
+                                        .Take(courseNumber)
+                                        .ToList();
+                return topCourses;
+            });
+        
+        return Result<List<CourseResponse>>.Success(result);
     }
 
     public async Task<Result> GetUpcomingSessions(int sessionNumber = 5)

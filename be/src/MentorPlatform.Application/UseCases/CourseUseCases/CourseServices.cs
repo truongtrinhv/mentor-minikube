@@ -5,6 +5,7 @@ using MentorPlatform.Application.Commons.Models.Lookup;
 using MentorPlatform.Application.Commons.Models.Requests.CourseRequests;
 using MentorPlatform.Application.Commons.Models.Responses.CourseResponses;
 using MentorPlatform.Application.Identity;
+using MentorPlatform.Application.Services.Caching;
 using MentorPlatform.Domain.Entities;
 using MentorPlatform.Domain.Enums;
 using MentorPlatform.Domain.Repositories;
@@ -19,18 +20,22 @@ public class CourseServices : ICourseServices
     private readonly IUnitOfWork _unitOfWork;
     private readonly IRepository<User, Guid> _userRepository;
     private readonly ICourseCategoryRepository _courseCategoryRepository;
+    private readonly ICacheService _cache;
 
-    public CourseServices(ICourseRepository courseRepository,
+    public CourseServices(
+        ICourseRepository courseRepository,
         IExecutionContext executionContext,
         IUnitOfWork unitOfWork,
         IRepository<User, Guid> userRepository,
-        ICourseCategoryRepository courseCategoryRepository)
+        ICourseCategoryRepository courseCategoryRepository,
+        ICacheService cache)
     {
         _courseRepository = courseRepository;
         _executionContext = executionContext;
         _unitOfWork = unitOfWork;
         _userRepository = userRepository;
         _courseCategoryRepository = courseCategoryRepository;
+        _cache = cache;
     }
 
     public async Task<Result> AddCourseAsync(CreateCourseRequest courseRequest)
@@ -75,6 +80,10 @@ public class CourseServices : ICourseServices
 
         _courseRepository.Add(newCourse);
         await _unitOfWork.SaveChangesAsync();
+
+        // Invalidate course caches
+        await _cache.RemoveAsync(CacheKeys.CoursesByMentor(userId));
+        await _cache.RemoveAsync(CacheKeys.CoursesByCategory(courseRequest.CourseCategoryId));
 
         Course? createdCourse = await _courseRepository.GetByIdAsync(newCourse.Id, nameof(Course.CourseCategory));
 
@@ -145,6 +154,15 @@ public class CourseServices : ICourseServices
         _courseRepository.Update(selectedCourse);
         await _unitOfWork.SaveChangesAsync();
 
+        // Invalidate course caches
+        await _cache.RemoveAsync(CacheKeys.Course(courseId));
+        await _cache.RemoveAsync(CacheKeys.CoursesByMentor(userId));
+        await _cache.RemoveAsync(CacheKeys.CoursesByCategory(courseRequest.CourseCategoryId));
+        if (selectedCourse.CourseCategoryId != courseRequest.CourseCategoryId)
+        {
+            await _cache.RemoveAsync(CacheKeys.CoursesByCategory(selectedCourse.CourseCategoryId));
+        }
+
         return Result<string>.Success(CourseCommandMessages.UpdateSuccessfully);
     }
 
@@ -171,6 +189,11 @@ public class CourseServices : ICourseServices
 
         _courseRepository.Remove(selectedCourse);
         await _unitOfWork.SaveChangesAsync();
+
+        // Invalidate course caches
+        await _cache.RemoveAsync(CacheKeys.Course(courseId));
+        await _cache.RemoveAsync(CacheKeys.CoursesByMentor(userId));
+        await _cache.RemoveAsync(CacheKeys.CoursesByCategory(selectedCourse.CourseCategoryId));
 
         return Result<string>.Success(CourseCommandMessages.DeleteSuccessfully);
     }

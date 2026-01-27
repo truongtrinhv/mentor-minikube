@@ -1,10 +1,12 @@
 ﻿using Amazon.S3;
 using MentorPlatform.Application.Identity;
+using MentorPlatform.Application.Services.Caching;
 using MentorPlatform.Application.Services.File;
 using MentorPlatform.Application.Services.HostedServices;
 using MentorPlatform.Application.Services.Mail;
 using MentorPlatform.Application.Services.Security;
 using MentorPlatform.CrossCuttingConcerns.Options;
+using MentorPlatform.Infrastructure.Caching;
 using MentorPlatform.Infrastructure.Emails;
 using MentorPlatform.Infrastructure.FileStorage;
 using MentorPlatform.Infrastructure.HostedServices;
@@ -13,6 +15,7 @@ using MentorPlatform.Infrastructure.Security;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using StackExchange.Redis;
 
 namespace MentorPlatform.Infrastructure.Extensions;
 
@@ -25,6 +28,7 @@ public static class DependencyInjection
         services.AddHostedService<MentorSessionReminderBackgroundService>();
         services.AddSingleton(typeof(IBackgroundTaskQueue<>), typeof(BackgroundTaskQueue<>));
         services.ConfigureInfrastructureServices()
+            .ConfigureCaching()
             .ConfigureExecutionContext()
             .ConfigureInfrastructureOptions();
         return services;
@@ -48,6 +52,20 @@ public static class DependencyInjection
                 return new CloudinaryStorageServices(fileStorageOptions, fileStorageOptions.CloudinaryStorageOptions!);
             });
         services.AddScoped<IFileStorageFactory, FileStorageFactory>();
+        return services;
+    }
+
+    public static IServiceCollection ConfigureCaching(this IServiceCollection services)
+    {
+        var config = GetConfiguration(services);
+        var redisConnection = config.GetConnectionString("Redis");
+
+        if (!string.IsNullOrEmpty(redisConnection))
+        {
+            services.AddSingleton<IConnectionMultiplexer>(sp => ConnectionMultiplexer.Connect(redisConnection));
+        }
+
+        services.AddScoped<ICacheService, CacheService>();
         return services;
     }
     public static IServiceCollection ConfigureExecutionContext(this IServiceCollection services)

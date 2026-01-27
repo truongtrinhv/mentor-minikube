@@ -1,10 +1,14 @@
-﻿using MentorPlatform.Application.Services.Security;
+﻿using MentorPlatform.Application.Services.Caching;
+using MentorPlatform.Application.Services.Security;
+using MentorPlatform.CrossCuttingConcerns.Options;
 using MentorPlatform.WebApi.Extensions;
 using MentorPlatform.WebApi.Hubs;
 using MentorPlatform.WebApi.Middlewares;
 using MentorPlatform.WebApi.OpenApi;
 using MentorPlatform.WebApi.Options;
+using MentorPlatform.WebApi.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using RazorLight;
 using System.Reflection;
@@ -86,10 +90,48 @@ builder.Services.AddCors(opt =>
     });
 });
 builder.Services.AddExceptionHandler<GlobalHandlingExceptionMiddleware>();
+
+// Memory Cache
 builder.Services.AddMemoryCache();
+
+// Redis Distributed Cache
+var redisEnabled = builder.Configuration.GetValue<bool>("RedisOptions:Enabled");
+if (redisEnabled)
+{
+    var redisConnection = builder.Configuration.GetConnectionString("Redis");
+    var instanceName = builder.Configuration.GetValue<string>("RedisOptions:InstanceName") ?? "MentorPlatform:";
+    
+    // Register ConnectionMultiplexer for advanced Redis operations
+    builder.Services.AddSingleton<StackExchange.Redis.IConnectionMultiplexer>(sp =>
+    {
+        return StackExchange.Redis.ConnectionMultiplexer.Connect(redisConnection!);
+    });
+    
+    builder.Services.AddStackExchangeRedisCache(options =>
+    {
+        options.Configuration = redisConnection;
+        options.InstanceName = instanceName;
+    });
+}
+else
+{
+    builder.Services.AddDistributedMemoryCache();
+}
+
+// Register distributed cache service
+builder.Services.AddScoped<IDistributedCacheService, DistributedCacheService>();
+
+// Configure Cache TTL Options
+builder.Services.Configure<CacheTTLOptions>(builder.Configuration.GetSection("CacheTTLOptions"));
+
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 var app = builder.Build();
+
+// Initialize CacheConfiguration with options
+var cacheTTLOptions = app.Services.GetRequiredService<IOptions<CacheTTLOptions>>();
+CacheConfiguration.Initialize(cacheTTLOptions);
+
 app.UseCors(corsOptions.PolicyName);
 
 app.UseCors(corsOptions.PolicyName);
