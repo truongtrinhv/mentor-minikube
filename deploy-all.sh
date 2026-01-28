@@ -54,11 +54,17 @@ echo ""
 # Build Frontend
 echo -e "${YELLOW}Building Frontend Docker image...${NC}"
 cd ../../fe
-docker build -t mentorplatform-fe:latest .
+docker build -t mentorplatform-frontend:latest .
 echo -e "${GREEN}✓ Frontend image built${NC}"
 echo ""
 
 cd ..
+
+# Create namespace if it doesn't exist
+echo -e "${BLUE}Creating namespace...${NC}"
+kubectl create namespace mentorplatform --dry-run=client -o yaml | kubectl apply -f -
+echo -e "${GREEN}✓ Namespace ready${NC}"
+echo ""
 
 # Deploy Redis Cache
 echo -e "${YELLOW}Deploying Redis Cache...${NC}"
@@ -95,7 +101,7 @@ echo ""
 
 # Wait for backend to be ready
 echo -e "${BLUE}Waiting for Backend API to be ready...${NC}"
-kubectl rollout status deployment/mentorplatform-api --timeout=300s
+kubectl rollout status deployment/mentorplatform-api -n mentorplatform --timeout=300s
 echo -e "${GREEN}✓ Backend API is ready${NC}"
 echo ""
 
@@ -152,17 +158,22 @@ echo "=================================================="
 echo -e "${GREEN}  Deployment Complete!${NC}"
 echo "=================================================="
 echo ""
-echo -e "${BLUE}Deployment Status:${NC}"
-echo "-------------------"
+echo -e "${BLUE}Deployment Status (Default Namespace):${NC}"
+echo "---------------------------------------"
 kubectl get deployments
 echo ""
-echo -e "${BLUE}Pods:${NC}"
-echo "------"
-kubectl get pods
+echo -e "${BLUE}Deployment Status (MentorPlatform Namespace):${NC}"
+echo "---------------------------------------------"
+kubectl get deployments -n mentorplatform
+echo ""
+echo -e "${BLUE}Pods (All Namespaces):${NC}"
+echo "----------------------"
+kubectl get pods --all-namespaces -l 'app in (mentorplatform-api,mentorplatform-gateway,mentorplatform-frontend,redis,rabbitmq)'
 echo ""
 echo -e "${BLUE}Services:${NC}"
 echo "---------"
 kubectl get services
+kubectl get services -n mentorplatform
 echo ""
 echo -e "${BLUE}HPA Status:${NC}"
 echo "-----------"
