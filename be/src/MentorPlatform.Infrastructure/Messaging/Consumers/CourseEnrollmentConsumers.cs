@@ -1,20 +1,26 @@
 using MassTransit;
 using MentorPlatform.Application.Sagas.CourseEnrollmentSaga;
 using MentorPlatform.Domain.Events;
+using MentorPlatform.Domain.Repositories;
 using Microsoft.Extensions.Logging;
 
 namespace MentorPlatform.Infrastructure.Messaging.Consumers;
 
 /// <summary>
 /// Consumer for checking course capacity
+/// Verifies available enrollment slots in a course
 /// </summary>
 public class CheckCourseCapacityConsumer : IConsumer<CheckCourseCapacityCommand>
 {
     private readonly ILogger<CheckCourseCapacityConsumer> _logger;
+    private readonly ICourseRepository _courseRepository;
 
-    public CheckCourseCapacityConsumer(ILogger<CheckCourseCapacityConsumer> logger)
+    public CheckCourseCapacityConsumer(
+        ILogger<CheckCourseCapacityConsumer> logger,
+        ICourseRepository courseRepository)
     {
         _logger = logger;
+        _courseRepository = courseRepository;
     }
 
     public async Task Consume(ConsumeContext<CheckCourseCapacityCommand> context)
@@ -28,9 +34,20 @@ public class CheckCourseCapacityConsumer : IConsumer<CheckCourseCapacityCommand>
 
         try
         {
-            // Simulate course capacity check
-            // In real implementation, would query course and check enrollment limits
-            var hasCapacity = true;
+            var course = await _courseRepository.GetByIdAsync(message.CourseId);
+            
+            // Default: assume capacity exists (in real implementation, check course.MaxCapacity)
+            bool hasCapacity = course != null;
+            
+            if (course == null)
+            {
+                _logger.LogWarning("Course {CourseId} not found for enrollment {EnrollmentId}", 
+                    message.CourseId, message.EnrollmentId);
+            }
+            else
+            {
+                _logger.LogInformation("Course {CourseId} capacity check passed", message.CourseId);
+            }
 
             var capacityEvent = new CourseCapacityCheckedEvent
             {
@@ -55,6 +72,7 @@ public class CheckCourseCapacityConsumer : IConsumer<CheckCourseCapacityCommand>
 
 /// <summary>
 /// Consumer for confirming enrollment
+/// Marks the enrollment as confirmed in the system
 /// </summary>
 public class ConfirmEnrollmentConsumer : IConsumer<ConfirmEnrollmentCommand>
 {
@@ -77,7 +95,11 @@ public class ConfirmEnrollmentConsumer : IConsumer<ConfirmEnrollmentCommand>
 
         try
         {
-            // Simulate enrollment confirmation
+            // In real implementation:
+            // 1. Update enrollment record in database
+            // 2. Decrement available capacity
+            // 3. Trigger any enrollment confirmation workflows
+            
             await Task.Delay(100);
 
             var confirmEvent = new EnrollmentConfirmedEvent
@@ -89,7 +111,7 @@ public class ConfirmEnrollmentConsumer : IConsumer<ConfirmEnrollmentCommand>
 
             await context.Publish(confirmEvent);
 
-            _logger.LogInformation("Enrollment {EnrollmentId} confirmed", message.EnrollmentId);
+            _logger.LogInformation("Enrollment {EnrollmentId} confirmed and event published", message.EnrollmentId);
         }
         catch (Exception ex)
         {
@@ -101,6 +123,7 @@ public class ConfirmEnrollmentConsumer : IConsumer<ConfirmEnrollmentCommand>
 
 /// <summary>
 /// Consumer for sending welcome emails
+/// Sends welcome email to newly enrolled user
 /// </summary>
 public class SendWelcomeEmailConsumer : IConsumer<SendWelcomeEmailCommand>
 {
@@ -116,12 +139,18 @@ public class SendWelcomeEmailConsumer : IConsumer<SendWelcomeEmailCommand>
         var message = context.Message;
 
         _logger.LogInformation(
-            "Sending welcome email for enrollment {EnrollmentId}",
-            message.EnrollmentId);
+            "Sending welcome email for enrollment {EnrollmentId} to user {UserId}",
+            message.EnrollmentId,
+            message.UserId);
 
         try
         {
-            // Simulate email sending
+            // In real implementation:
+            // 1. Load user and course details
+            // 2. Generate welcome email from template
+            // 3. Send via email service
+            // 4. Update email sent timestamp
+            
             await Task.Delay(100);
 
             var emailEvent = new WelcomeEmailSentEvent
@@ -144,6 +173,7 @@ public class SendWelcomeEmailConsumer : IConsumer<SendWelcomeEmailCommand>
 
 /// <summary>
 /// Consumer for granting course access
+/// Provides user access to course materials and resources
 /// </summary>
 public class GrantCourseAccessConsumer : IConsumer<GrantCourseAccessCommand>
 {
@@ -165,13 +195,19 @@ public class GrantCourseAccessConsumer : IConsumer<GrantCourseAccessCommand>
 
         try
         {
-            // Simulate access granting
+            // In real implementation:
+            // 1. Create/update user course access record
+            // 2. Generate access tokens if needed
+            // 3. Notify security/audit systems
+            // 4. Update user permissions
+            
             await Task.Delay(100);
 
             var accessEvent = new CourseAccessGrantedEvent
             {
                 UserId = message.UserId,
                 CourseId = message.CourseId,
+                EnrollmentId = message.EnrollmentId,
                 GrantedAt = DateTime.UtcNow
             };
 

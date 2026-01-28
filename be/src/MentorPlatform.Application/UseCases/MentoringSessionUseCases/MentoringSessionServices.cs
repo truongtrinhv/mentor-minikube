@@ -10,11 +10,14 @@ using MentorPlatform.Application.Identity;
 using MentorPlatform.Application.Services.Caching;
 using MentorPlatform.Application.Services.HostedServices;
 using MentorPlatform.Application.Services.Mail;
+using MentorPlatform.Application.Services.Messaging;
 using MentorPlatform.Domain.Entities;
 using MentorPlatform.Domain.Enums;
+using MentorPlatform.Domain.Events;
 using MentorPlatform.Domain.Repositories;
 using MentorPlatform.Domain.Shared;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using RazorLight;
 
 namespace MentorPlatform.Application.UseCases.MentoringSessionUseCases;
@@ -30,6 +33,9 @@ public class MentoringSessionServices : IMentoringSessionServices
     private readonly IBackgroundTaskQueue<Func<IServiceProvider, CancellationToken, ValueTask>> _mailQueue;
     private readonly IRazorLightEngine _razorLightEngine;
     private readonly ICacheService _cacheService;
+    private readonly IDomainEventDispatcher _eventDispatcher;
+    private readonly ILogger<MentoringSessionServices> _logger;
+    
     public MentoringSessionServices(IMentoringSessionRepository mentoringSessionRepository,
                                     IUnitOfWork unitOfWork,
                                     IExecutionContext executionContext,
@@ -38,7 +44,9 @@ public class MentoringSessionServices : IMentoringSessionServices
                                     ICourseRepository courseRepository,
                                     IBackgroundTaskQueue<Func<IServiceProvider, CancellationToken, ValueTask>> mailQueue,
                                     IRazorLightEngine razorLightEngine,
-                                    ICacheService cacheService)
+                                    ICacheService cacheService,
+                                    IDomainEventDispatcher eventDispatcher,
+                                    ILogger<MentoringSessionServices> logger)
     {
         _mentoringSessionRepository = mentoringSessionRepository;
         _unitOfWork = unitOfWork;
@@ -49,6 +57,8 @@ public class MentoringSessionServices : IMentoringSessionServices
         _mailQueue = mailQueue;
         _razorLightEngine = razorLightEngine;
         _cacheService = cacheService;
+        _eventDispatcher = eventDispatcher;
+        _logger = logger;
     }
 
     public async Task<Result> GetAvailableSchedulesAsync(ScheduleQueryParameters queryParameters)
@@ -138,6 +148,28 @@ public class MentoringSessionServices : IMentoringSessionServices
         await _cacheService.RemoveByPrefixAsync(CacheKeys.AvailableSchedules(selectedSchedule.MentorId));
         await _cacheService.RemoveByPrefixAsync(CacheKeys.SessionsByMentor(selectedSchedule.MentorId));
         await _cacheService.RemoveByPrefixAsync(CacheKeys.SessionsByLearner(selectedUser.Id));
+        
+        // Publish domain event to trigger saga orchestration
+        var sessionCreatedEvent = new MentoringSessionCreatedEvent
+        {
+            SessionId = mentoringSession.Id,
+            LearnerId = selectedUser.Id,
+            MentorId = selectedSchedule.MentorId,
+            ScheduleId = selectedSchedule.Id,
+            CourseId = selectedCourse.Id,
+            SessionType = (int)mentoringSession.SessionType
+        };
+        
+        try
+        {
+            await _eventDispatcher.DispatchAsync(sessionCreatedEvent);
+            _logger.LogInformation("Domain event published: MentoringSessionCreated for SessionId {SessionId}", mentoringSession.Id);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to publish MentoringSessionCreated event for SessionId {SessionId}", mentoringSession.Id);
+            // Don't throw - session was created successfully, saga will eventually be triggered on retry
+        }
         
         await SendBookingConfirmationEmailAsync(selectedSchedule.MentorId, selectedUser.Id, selectedSchedule, selectedCourse, mentoringSession.SessionType);
         return Result<string>.Success(MentoringSessionCommandMessages.CreateSuccessfully, 201);

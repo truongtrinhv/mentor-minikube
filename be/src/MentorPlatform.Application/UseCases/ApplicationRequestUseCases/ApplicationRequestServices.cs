@@ -11,11 +11,14 @@ using MentorPlatform.Application.Services.File;
 using MentorPlatform.Application.Services.FileStorage;
 using MentorPlatform.Application.Services.HostedServices;
 using MentorPlatform.Application.Services.Mail;
+using MentorPlatform.Application.Services.Messaging;
 using MentorPlatform.Domain.Entities;
 using MentorPlatform.Domain.Enums;
+using MentorPlatform.Domain.Events;
 using MentorPlatform.Domain.Repositories;
 using MentorPlatform.Domain.Shared;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using RazorLight;
 
 namespace MentorPlatform.Application.UseCases.ApplicationRequestUseCases;
@@ -29,13 +32,18 @@ public class ApplicationRequestServices : IApplicationRequestServices
     private readonly IExecutionContext _executionContext;
     private readonly IBackgroundTaskQueue<Func<IServiceProvider, CancellationToken, ValueTask>> _mailQueue;
     private readonly IRazorLightEngine _razorLightEngine;
+    private readonly IDomainEventDispatcher _eventDispatcher;
+    private readonly ILogger<ApplicationRequestServices> _logger;
+    
     public ApplicationRequestServices(IFileStorageFactory fileStorageServices,
         IApplicationRequestRepository applicationRequestRepository,
         IUnitOfWork unitOfWork,
         IExecutionContext executionContext,
         IBackgroundTaskQueue<Func<IServiceProvider, CancellationToken, ValueTask>> mailQueue,
         IRazorLightEngine razorLightEngine,
-        IUserRepository userRepository)
+        IUserRepository userRepository,
+        IDomainEventDispatcher eventDispatcher,
+        ILogger<ApplicationRequestServices> logger)
     {
         _userRepository = userRepository;
         _razorLightEngine = razorLightEngine;
@@ -44,6 +52,8 @@ public class ApplicationRequestServices : IApplicationRequestServices
         _unitOfWork = unitOfWork;
         _fileStorageServices = fileStorageServices.Get();
         _applicationRequestRepository = applicationRequestRepository;
+        _eventDispatcher = eventDispatcher;
+        _logger = logger;
     }
 
     public async Task<Result> CreateAsync(CreateApplicationRequestMentorRequest createApplicationRequestMentorRequest)
@@ -93,6 +103,25 @@ public class ApplicationRequestServices : IApplicationRequestServices
 
         _applicationRequestRepository.Add(applicationRequest);
         await _unitOfWork.SaveChangesAsync();
+
+        // Publish domain event to trigger saga orchestration
+        var requestSubmittedEvent = new ApplicationRequestSubmittedEvent
+        {
+            RequestId = applicationRequest.Id,
+            UserId = currentUserId,
+            SubmittedAt = DateTime.UtcNow
+        };
+
+        try
+        {
+            await _eventDispatcher.DispatchAsync(requestSubmittedEvent);
+            _logger.LogInformation("Domain event published: ApplicationRequestSubmitted for RequestId {RequestId}", applicationRequest.Id);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to publish ApplicationRequestSubmitted event for RequestId {RequestId}", applicationRequest.Id);
+            // Don't throw - request was created successfully, saga will eventually be triggered on retry
+        }
 
         return Result<string>.Success(ApplicationRequestCommandMessages.CreateSuccessfully);
     }

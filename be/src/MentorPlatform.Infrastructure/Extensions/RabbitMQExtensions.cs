@@ -2,6 +2,7 @@ using MassTransit;
 using MentorPlatform.Application.Sagas.ApplicationRequestSaga;
 using MentorPlatform.Application.Sagas.CourseEnrollmentSaga;
 using MentorPlatform.Application.Sagas.MentoringSessionSaga;
+using MentorPlatform.Application.Services.Messaging;
 using MentorPlatform.Infrastructure.Messaging.Configuration;
 using MentorPlatform.Infrastructure.Messaging.Consumers;
 using Microsoft.Extensions.Configuration;
@@ -89,15 +90,6 @@ public static class RabbitMQExtensions
         services.AddScoped<IDomainEventDispatcher, DomainEventDispatcher>();
         return services;
     }
-}
-
-/// <summary>
-/// Interface for dispatching domain events via RabbitMQ
-/// </summary>
-public interface IDomainEventDispatcher
-{
-    Task DispatchAsync(MentorPlatform.Domain.Primitives.IDomainEvent domainEvent);
-    Task DispatchAsync(IEnumerable<MentorPlatform.Domain.Primitives.IDomainEvent> domainEvents);
 }
 
 /// <summary>

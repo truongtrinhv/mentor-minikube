@@ -6,10 +6,13 @@ using MentorPlatform.Application.Commons.Models.Requests.CourseRequests;
 using MentorPlatform.Application.Commons.Models.Responses.CourseResponses;
 using MentorPlatform.Application.Identity;
 using MentorPlatform.Application.Services.Caching;
+using MentorPlatform.Application.Services.Messaging;
 using MentorPlatform.Domain.Entities;
 using MentorPlatform.Domain.Enums;
+using MentorPlatform.Domain.Events;
 using MentorPlatform.Domain.Repositories;
 using MentorPlatform.Domain.Shared;
+using Microsoft.Extensions.Logging;
 
 namespace MentorPlatform.Application.UseCases.CourseUseCases;
 
@@ -21,6 +24,8 @@ public class CourseServices : ICourseServices
     private readonly IRepository<User, Guid> _userRepository;
     private readonly ICourseCategoryRepository _courseCategoryRepository;
     private readonly ICacheService _cache;
+    private readonly IDomainEventDispatcher _eventDispatcher;
+    private readonly ILogger<CourseServices> _logger;
 
     public CourseServices(
         ICourseRepository courseRepository,
@@ -28,7 +33,9 @@ public class CourseServices : ICourseServices
         IUnitOfWork unitOfWork,
         IRepository<User, Guid> userRepository,
         ICourseCategoryRepository courseCategoryRepository,
-        ICacheService cache)
+        ICacheService cache,
+        IDomainEventDispatcher eventDispatcher,
+        ILogger<CourseServices> logger)
     {
         _courseRepository = courseRepository;
         _executionContext = executionContext;
@@ -36,6 +43,8 @@ public class CourseServices : ICourseServices
         _userRepository = userRepository;
         _courseCategoryRepository = courseCategoryRepository;
         _cache = cache;
+        _eventDispatcher = eventDispatcher;
+        _logger = logger;
     }
 
     public async Task<Result> AddCourseAsync(CreateCourseRequest courseRequest)
