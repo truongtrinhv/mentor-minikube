@@ -2,7 +2,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: mentorplatform-gateway-service
-  namespace: default
+  namespace: mentorplatform
   labels:
     app: mentorplatform-gateway
     tier: gateway
@@ -25,7 +25,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: mentorplatform-gateway-nodeport
-  namespace: default
+  namespace: mentorplatform
   labels:
     app: mentorplatform-gateway
     tier: gateway
@@ -46,7 +46,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: mentorplatform-gateway-loadbalancer
-  namespace: default
+  namespace: mentorplatform
   labels:
     app: mentorplatform-gateway
     tier: gateway

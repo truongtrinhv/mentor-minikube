@@ -2,6 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: mentorplatform-frontend
+  namespace: mentorplatform
   labels:
     app: mentorplatform-frontend
     tier: frontend

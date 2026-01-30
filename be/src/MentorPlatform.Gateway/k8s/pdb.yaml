@@ -3,7 +3,7 @@ apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
   name: mentorplatform-gateway-pdb
-  namespace: default
+  namespace: mentorplatform
   labels:
     app: mentorplatform-gateway
     tier: gateway

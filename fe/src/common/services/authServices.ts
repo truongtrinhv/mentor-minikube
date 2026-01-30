@@ -10,17 +10,20 @@ import type {
     VerifyEmailResponse,
 } from "../types/auth";
 
+// Get API URL from environment or use default
+const API_URL = import.meta.env.VITE_API_URL_ROOT || 'http://localhost:8000/api';
+
 const authService = {
     login: (body: LoginRequest) =>
-        httpClient.post<LoginResponse>("auth/login", body),
+        httpClient.post<LoginResponse>(`${API_URL}/auth/login`, body),
     verifyEmail: (body: VerifyEmailRequest) =>
-        httpClient.post<VerifyEmailResponse>("auth/verify-email", body),
-    getCurrentUser: () => httpClient.get<CurrentUser>("auth/me"),
-    logout: () => httpClient.post("auth/logout"),
+        httpClient.post<VerifyEmailResponse>(`${API_URL}/auth/verify-email`, body),
+    getCurrentUser: () => httpClient.get<CurrentUser>(`${API_URL}/auth/me`),
+    logout: () => httpClient.post(`${API_URL}/auth/logout`),
     getRefreshToken: (body: RefreshTokenRequest) =>
-        httpClient.post<RefreshTokenResponse>("auth/refresh-token", body),
+        httpClient.post<RefreshTokenResponse>(`${API_URL}/auth/refresh-token`, body),
     resendVerifyEmail: (body: ResendVerifyEmailRequest) =>
-        httpClient.post("auth/resend-verify-email", body),
+        httpClient.post(`${API_URL}/auth/resend-verify-email`, body),
 };
 
 export default authService;

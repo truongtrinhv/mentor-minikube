@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: mentorplatform-gateway
-  namespace: default
+  namespace: mentorplatform
   labels:
     app: mentorplatform-gateway
     tier: gateway

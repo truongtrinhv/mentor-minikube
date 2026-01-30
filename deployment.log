@@ -1,0 +1,268 @@
+==================================================
+  MentorPlatform Complete Deployment with Gateway
+==================================================
+
+[0;34mChecking prerequisites...[0m
+[0;32m✓ All prerequisites found[0m
+
+[0;32m✓ Minikube is already running[0m
+
+[0;34mConfiguring Docker environment...[0m
+[0;32m✓ Docker configured[0m
+
+[1;33mBuilding Backend API Docker image...[0m
+#0 building with "default" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 1.95kB 0.1s done
+#1 DONE 0.1s
+
+#2 [internal] load metadata for mcr.microsoft.com/dotnet/sdk:9.0
+#2 DONE 0.7s
+
+#3 [internal] load metadata for mcr.microsoft.com/dotnet/aspnet:9.0
+#3 DONE 0.7s
+
+#4 [internal] load .dockerignore
+#4 transferring context: 2B 0.0s done
+#4 DONE 0.1s
+
+#5 [build  1/13] FROM mcr.microsoft.com/dotnet/sdk:9.0@sha256:0d84f05256dec37a5d1739158fd5ea197b8ad3b4e8d0e32be47b754db5963a9e
+#5 DONE 0.0s
+
+#6 [final 1/5] FROM mcr.microsoft.com/dotnet/aspnet:9.0@sha256:8bbb7b9045f04a32d2eaad43b351e67f07c1f9604811dd505fc3654b4bec2176
+#6 DONE 0.0s
+
+#7 [internal] load build context
+#7 transferring context: 1.66MB 5.0s
+#7 transferring context: 3.41MB 5.8s done
+#7 DONE 5.8s
+
+#8 [build  3/13] COPY [MentorPlatform.API/MentorPlatform.WebApi.csproj, MentorPlatform.API/]
+#8 CACHED
+
+#9 [final 4/5] COPY --from=publish /app/publish .
+#9 CACHED
+
+#10 [build  2/13] WORKDIR /src
+#10 CACHED
+
+#11 [build 11/13] COPY . .
+#11 CACHED
+
+#12 [publish 1/1] RUN dotnet publish "MentorPlatform.WebApi.csproj" -c Release -o /app/publish /p:UseAppHost=false
+#12 CACHED
+
+#13 [build  9/13] RUN dotnet nuget locals all --clear || true
+#13 CACHED
+
+#14 [build 10/13] RUN for i in 1 2 3; do dotnet restore "MentorPlatform.API/MentorPlatform.WebApi.csproj" --disable-parallel && break || sleep 5; done
+#14 CACHED
+
+#15 [final 3/5] RUN groupadd -r appuser && useradd -r -g appuser appuser
+#15 CACHED
+
+#16 [build  4/13] COPY [MentorPlatform.Application/MentorPlatform.Application.csproj, MentorPlatform.Application/]
+#16 CACHED
+
+#17 [final 2/5] WORKDIR /app
+#17 CACHED
+
+#18 [build 13/13] RUN dotnet build "MentorPlatform.WebApi.csproj" -c Release -o /app/build
+#18 CACHED
+
+#19 [build  5/13] COPY [MentorPlatform.CrossCuttingConcerns/MentorPlatform.CrossCuttingConcerns.csproj, MentorPlatform.CrossCuttingConcerns/]
+#19 CACHED
+
+#20 [build  7/13] COPY [MentorPlatform.Persistence/MentorPlatform.Persistence.csproj, MentorPlatform.Persistence/]
+#20 CACHED
+
+#21 [build  8/13] COPY [MentorPlatform.Domain/MentorPlatform.Domain.csproj, MentorPlatform.Domain/]
+#21 CACHED
+
+#22 [build  6/13] COPY [MentorPlatform.Infrastructure/MentorPlatform.Infrastructure.csproj, MentorPlatform.Infrastructure/]
+#22 CACHED
+
+#23 [build 12/13] WORKDIR /src/MentorPlatform.API
+#23 CACHED
+
+#24 [final 5/5] RUN chown -R appuser:appuser /app
+#24 CACHED
+
+#25 exporting to image
+#25 exporting layers done
+#25 writing image sha256:c4bc7f9d197971364d34d2b567793545da21d0506889047c7fcf9514527b54da done
+#25 naming to docker.io/library/mentorplatform-api:latest 0.0s done
+#25 DONE 0.0s
+[0;32m✓ Backend API image built[0m
+
+[1;33mBuilding API Gateway Docker image...[0m
+#0 building with "default" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 1.63kB 0.1s done
+#1 DONE 0.1s
+
+#2 [internal] load metadata for mcr.microsoft.com/dotnet/aspnet:8.0
+#2 DONE 0.1s
+
+#3 [internal] load metadata for mcr.microsoft.com/dotnet/sdk:8.0
+#3 DONE 0.2s
+
+#4 [internal] load .dockerignore
+#4 transferring context: 2B 0.1s done
+#4 DONE 0.1s
+
+#5 [build 1/7] FROM mcr.microsoft.com/dotnet/sdk:8.0@sha256:aa05b91be697b83229cb000b90120f0783604ad74ed92a0b45cdf3d1a9c873de
+#5 DONE 0.0s
+
+#6 [final 1/6] FROM mcr.microsoft.com/dotnet/aspnet:8.0@sha256:4b8f0b08534833b39bb662fb19a65e78cb086f5ca8dd35de3f87026de8885be4
+#6 DONE 0.0s
+
+#7 [internal] load build context
+#7 transferring context: 2.12kB 0.9s done
+#7 DONE 0.9s
+
+#8 [build 4/7] RUN dotnet restore "MentorPlatform.Gateway/MentorPlatform.Gateway.csproj"
+#8 CACHED
+
+#9 [build 2/7] WORKDIR /src
+#9 CACHED
+
+#10 [final 4/6] WORKDIR /app
+#10 CACHED
+
+#11 [final 2/6] RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+#11 CACHED
+
+#12 [build 3/7] COPY MentorPlatform.Gateway/MentorPlatform.Gateway.csproj MentorPlatform.Gateway/
+#12 CACHED
+
+#13 [build 7/7] RUN dotnet build "MentorPlatform.Gateway.csproj" -c Release -o /app/build
+#13 CACHED
+
+#14 [publish 1/1] RUN dotnet publish "MentorPlatform.Gateway.csproj" -c Release -o /app/publish /p:UseAppHost=false
+#14 CACHED
+
+#15 [final 5/6] COPY --from=publish /app/publish .
+#15 CACHED
+
+#16 [build 5/7] COPY MentorPlatform.Gateway/ MentorPlatform.Gateway/
+#16 CACHED
+
+#17 [build 6/7] WORKDIR /src/MentorPlatform.Gateway
+#17 CACHED
+
+#18 [final 3/6] RUN groupadd -r appuser --gid=1000 && useradd -r -g appuser --uid=1000 --home-dir=/app --shell=/bin/bash appuser
+#18 CACHED
+
+#19 [final 6/6] RUN chown -R appuser:appuser /app
+#19 CACHED
+
+#20 exporting to image
+#20 exporting layers done
+#20 writing image sha256:24ad3d9ef3e68ca834617d0a73bb240ad78de619981ebdab92b72243493a1eef done
+#20 naming to docker.io/library/mentorplatform-gateway:latest
+#20 naming to docker.io/library/mentorplatform-gateway:latest 0.0s done
+#20 DONE 0.1s
+[0;32m✓ API Gateway image built[0m
+
+[1;33mBuilding Frontend Docker image...[0m
+#0 building with "default" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 1.07kB 0.1s done
+#1 DONE 0.1s
+
+#2 [internal] load metadata for docker.io/library/node:20-alpine
+#2 DONE 2.3s
+
+#3 [internal] load metadata for docker.io/library/nginx:alpine
+#3 DONE 2.6s
+
+#4 [internal] load .dockerignore
+#4 transferring context: 33B 0.0s
+#4 transferring context: 393B 0.2s done
+#4 DONE 0.2s
+
+#5 [builder 1/6] FROM docker.io/library/node:20-alpine@sha256:09e2b3d9726018aecf269bd35325f46bf75046a643a66d28360ec71132750ec8
+#5 DONE 0.0s
+
+#6 [stage-1 1/5] FROM docker.io/library/nginx:alpine@sha256:7d7a15b8a280c661051955f14c2b91fed3e23724ddba18d2f53e8b44e74ab37a
+#6 DONE 0.0s
+
+#7 [internal] load build context
+#7 transferring context: 26.00kB 5.0s
+#7 transferring context: 33.13kB 8.0s done
+#7 DONE 8.0s
+
+#8 [stage-1 4/5] COPY docker-entrypoint.sh /docker-entrypoint.sh
+#8 CACHED
+
+#9 [builder 2/6] WORKDIR /app
+#9 CACHED
+
+#10 [builder 3/6] COPY package*.json ./
+#10 CACHED
+
+#11 [builder 6/6] RUN npm run build
+#11 CACHED
+
+#12 [stage-1 3/5] COPY --from=builder /app/dist /usr/share/nginx/html
+#12 CACHED
+
+#13 [stage-1 2/5] COPY nginx.conf /etc/nginx/conf.d/default.conf
+#13 CACHED
+
+#14 [builder 4/6] RUN npm install --legacy-peer-deps
+#14 CACHED
+
+#15 [builder 5/6] COPY . .
+#15 CACHED
+
+#16 [stage-1 5/5] RUN chmod +x /docker-entrypoint.sh
+#16 CACHED
+
+#17 exporting to image
+#17 exporting layers done
+#17 writing image sha256:7b64b96c5d9117ce557e24c68ffbff5c54e54a56e4dfe7bedf93b82ae1259380 0.0s done
+#17 naming to docker.io/library/mentorplatform-frontend:latest 0.0s done
+#17 DONE 0.1s
+[0;32m✓ Frontend image built[0m
+
+[0;34mCreating namespace...[0m
+namespace/mentorplatform created
+[0;32m✓ Namespace ready[0m
+
+[1;33mDeploying Redis Cache...[0m
+persistentvolumeclaim/redis-pvc created
+deployment.apps/redis created
+service/redis created
+[0;32m✓ Redis deployed[0m
+
+[0;34mWaiting for Redis to be ready...[0m
+pod/redis-c96b66dd4-b4mgr condition met
+[0;32m✓ Redis is ready[0m
+
+[1;33mDeploying RabbitMQ Message Broker...[0m
+configmap/rabbitmq-config created
+service/rabbitmq created
+service/rabbitmq-management created
+statefulset.apps/rabbitmq created
+[0;32m✓ RabbitMQ deployed[0m
+
+[0;34mWaiting for RabbitMQ to be ready...[0m
+pod/rabbitmq-0 condition met
+[0;32m✓ RabbitMQ is ready[0m
+
+[1;33mDeploying Backend API...[0m
+configmap/mentorplatform-config created
+secret/mentorplatform-secrets created
+deployment.apps/mentorplatform-api created
+service/mentorplatform-api-service created
+service/mentorplatform-api-loadbalancer created
+[0;32m✓ Backend API deployed[0m
+
+[0;34mWaiting for Backend API to be ready...[0m
+Waiting for deployment "mentorplatform-api" rollout to finish: 0 of 2 updated replicas are available...
+error: timed out waiting for the condition

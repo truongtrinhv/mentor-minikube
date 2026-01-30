@@ -6,7 +6,7 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: mentorplatform-ingress
-  namespace: default
+  namespace: mentorplatform
   annotations:
     # nginx.ingress.kubernetes.io/rewrite-target: /
     nginx.ingress.kubernetes.io/ssl-redirect: "true"
@@ -35,7 +35,7 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: mentorplatform-ingress-http
-  namespace: default
+  namespace: mentorplatform
   annotations:
     nginx.ingress.kubernetes.io/websocket-services: "mentorplatform-api-service"
 spec:

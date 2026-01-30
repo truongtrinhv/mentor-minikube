@@ -90,6 +90,18 @@ kubectl wait --for=condition=ready pod -l app=rabbitmq -n mentorplatform --timeo
 echo -e "${GREEN}✓ RabbitMQ is ready${NC}"
 echo ""
 
+# Deploy SQL Server Database
+echo -e "${YELLOW}Deploying SQL Server Database...${NC}"
+kubectl apply -f be/src/MentorPlatform.API/k8s/database.yaml
+echo -e "${GREEN}✓ Database deployed${NC}"
+echo ""
+
+# Wait for Database to be ready
+echo -e "${BLUE}Waiting for SQL Server to be ready...${NC}"
+kubectl wait --for=condition=ready pod -l app=mssql -n mentorplatform --timeout=300s
+echo -e "${GREEN}✓ SQL Server is ready${NC}"
+echo ""
+
 # Deploy Backend API
 echo -e "${YELLOW}Deploying Backend API...${NC}"
 kubectl apply -f be/src/MentorPlatform.API/k8s/configmap.yaml
@@ -118,17 +130,17 @@ echo ""
 
 # Wait for gateway to be ready
 echo -e "${BLUE}Waiting for API Gateway to be ready...${NC}"
-if ! kubectl rollout status deployment/mentorplatform-gateway --timeout=300s; then
+if ! kubectl rollout status deployment/mentorplatform-gateway -n mentorplatform --timeout=300s; then
     echo -e "${RED}✗ Gateway deployment failed. Showing diagnostics:${NC}"
     echo ""
     echo -e "${YELLOW}Pod Status:${NC}"
-    kubectl get pods -l app=mentorplatform-gateway
+    kubectl get pods -n mentorplatform -l app=mentorplatform-gateway
     echo ""
     echo -e "${YELLOW}Pod Events:${NC}"
-    kubectl describe pods -l app=mentorplatform-gateway | grep -A 10 Events
+    kubectl describe pods -n mentorplatform -l app=mentorplatform-gateway | grep -A 10 Events
     echo ""
     echo -e "${YELLOW}Pod Logs:${NC}"
-    kubectl logs -l app=mentorplatform-gateway --tail=50 --all-containers=true
+    kubectl logs -n mentorplatform -l app=mentorplatform-gateway --tail=50 --all-containers=true
     exit 1
 fi
 echo -e "${GREEN}✓ API Gateway is ready${NC}"
@@ -145,7 +157,7 @@ echo ""
 
 # Wait for frontend to be ready
 echo -e "${BLUE}Waiting for Frontend to be ready...${NC}"
-kubectl rollout status deployment/mentorplatform-frontend --timeout=300s
+kubectl rollout status deployment/mentorplatform-frontend -n mentorplatform --timeout=300s
 echo -e "${GREEN}✓ Frontend is ready${NC}"
 echo ""
 

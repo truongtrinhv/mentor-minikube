@@ -2,8 +2,9 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: mentorplatform-fe-config
+  namespace: mentorplatform
   labels:
     app: mentorplatform-frontend
 data:
-  # API Service URL - using /api prefix, nginx will proxy to backend
-  VITE_API_URL_ROOT: "/api"
+  # API Service URL - pointing to Gateway with /api path
+  VITE_API_URL_ROOT: "http://localhost:8000/api"

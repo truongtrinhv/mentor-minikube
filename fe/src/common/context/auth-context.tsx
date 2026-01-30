@@ -129,9 +129,12 @@ const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
         if (!isAuthenticated) {
             return;
         }
+        const API_URL = import.meta.env.VITE_API_URL_ROOT || 'http://localhost:8000/api';
+
         const connection = new HubConnectionBuilder()
             .withUrl(
-                import.meta.env.VITE_API_URL_ROOT.replace("/api", "/hubs/live"),
+
+                API_URL.replace("/api", "/hubs/live"),
                 {
                     accessTokenFactory: async () => {
                         let accessToken = getAccessToken();
